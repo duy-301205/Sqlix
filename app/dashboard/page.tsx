@@ -319,7 +319,7 @@ export default function DashboardPage() {
                         <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-black text-slate-900 text-base">Kỳ thi thử gần đây</h3>
-                                <Link className="text-xs font-bold text-blue-600 hover:underline" href="/dashboard/mock-test">
+                                <Link className="text-xs font-bold text-blue-600 hover:underline" href="/mock-test">
                                     Lịch sử thi →
                                 </Link>
                             </div>
