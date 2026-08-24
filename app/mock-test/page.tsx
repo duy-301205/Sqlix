@@ -488,50 +488,65 @@ function OverviewStat({
 
 function TestModal({ item, onClose }: { item: MockTestItem; onClose: () => void }) {
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 relative border border-slate-100">
+        <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-200"
+            onClick={onClose}
+        >
+            <div
+                className="bg-white rounded-2xl p-5 sm:p-6 w-[92vw] sm:w-[420px] max-w-[420px] shadow-2xl space-y-4 relative border border-slate-100"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header Modal */}
                 <div className="flex items-center gap-3">
                     <div
-                        className={`w-12 h-12 rounded-xl ${item.iconBg} ${item.iconColor} border flex items-center justify-center shrink-0`}
+                        className={`w-11 h-11 rounded-xl ${item.iconBg} ${item.iconColor} border flex items-center justify-center shrink-0 shadow-xs`}
                     >
                         <CategoryIcon icon={item.icon} />
                     </div>
-                    <div>
-                        <h3 className="text-sm font-bold text-slate-900">{item.title}</h3>
-                        <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded border ${item.difficultyColor}`}
-                        >
-                            {item.difficulty}
-                        </span>
+                    <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-bold text-slate-900 truncate">{item.title}</h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded border ${item.difficultyColor}`}
+                            >
+                                {item.difficulty}
+                            </span>
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase">
+                                {item.category}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
-                <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200 leading-relaxed">
+                {/* Mô tả */}
+                <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200/80 leading-relaxed">
                     {item.description}
                 </p>
 
+                {/* Thông số nhanh */}
                 <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
                         <div className="text-slate-400 text-[10px]">Số câu hỏi</div>
                         <div className="font-bold text-slate-800 mt-0.5">{item.questionsCount} câu</div>
                     </div>
-                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
                         <div className="text-slate-400 text-[10px]">Thời gian</div>
                         <div className="font-bold text-blue-600 mt-0.5">{item.durationMinutes} phút</div>
                     </div>
                 </div>
 
-                <div className="flex gap-2.5 pt-2">
+                {/* Nút hành động */}
+                <div className="flex gap-2.5 pt-1">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
+                        className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
                     >
                         Hủy
                     </button>
                     <Link
                         href={`/mock-test/${item.id}`}
-                        className="flex-1 py-2.5 bg-blue-600 text-white font-bold text-xs rounded-xl text-center hover:bg-blue-700 transition-colors cursor-pointer shadow-sm hover:shadow"
+                        className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl text-center transition-colors cursor-pointer shadow-xs hover:shadow"
                     >
                         Vào phòng thi
                     </Link>
