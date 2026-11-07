@@ -7,7 +7,7 @@ export const apiClient = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 15000,
+    timeout: 10000,
 });
 
 // Quản lý trạng thái refresh token để tránh gọi nhiều lần đồng thời
@@ -33,8 +33,20 @@ apiClient.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
         if (typeof window !== 'undefined') {
             const accessToken = localStorage.getItem('accessToken');
+            const url = config.url || '';
+            const isPublicAuthEndpoint =
+                url.includes('/api/auth/login') ||
+                url.includes('/api/auth/register') ||
+                url.includes('/api/auth/forgot-password') ||
+                url.includes('/api/auth/reset-password') ||
+                url.includes('/api/auth/verify-email');
+
             if (accessToken && config.headers) {
                 config.headers.Authorization = `Bearer ${accessToken}`;
+            } else if (!isPublicAuthEndpoint) {
+                console.warn(
+                    `[API Client] Gửi request [${config.method?.toUpperCase()} ${url}] nhưng không có accessToken trong localStorage!`
+                );
             }
         }
         return config;
@@ -42,18 +54,33 @@ apiClient.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// 2. Response Interceptor: Bắt lỗi 401 và tự động refresh token
+// 2. Response Interceptor: Xử lý tự động refresh token khi gặp 401 Unauthorized
 apiClient.interceptors.response.use(
     (response) => response,
     async (error: AxiosError) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-        // Nếu không có response hoặc mã không phải 401 hoặc request đã retry rồi thì trả về lỗi
-        if (!error.response || error.response.status !== 401 || !originalRequest) {
+        if (!error.response || !originalRequest) {
             return Promise.reject(error);
         }
 
-        // Bỏ qua nếu endpoint chính là login, refresh hoặc logout để tránh lặp vô tận
+        const status = error.response.status;
+
+        // Xử lý lỗi 403 Forbidden: Tài khoản không có quyền (không refresh token vì refresh vẫn sẽ không có quyền)
+        if (status === 403) {
+            console.error(
+                `[API Client] 403 Forbidden tại [${originalRequest.method?.toUpperCase()} ${originalRequest.url}]:`,
+                error.response.data
+            );
+            return Promise.reject(error);
+        }
+
+        // Chỉ xử lý tự động refresh token với lỗi 401 Unauthorized
+        if (status !== 401) {
+            return Promise.reject(error);
+        }
+
+        // Bỏ qua nếu chính endpoint login hoặc refresh bị 401 để tránh lặp vô tận
         const url = originalRequest.url || '';
         if (url.includes('/api/auth/login') || url.includes('/api/auth/refresh')) {
             return Promise.reject(error);
@@ -83,7 +110,7 @@ apiClient.interceptors.response.use(
         const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
 
         if (!refreshToken) {
-            // Không có refresh token -> Đăng xuất người dùng
+            console.warn('[API Client] Không có refreshToken. Chuyển hướng sang /login');
             if (typeof window !== 'undefined') {
                 localStorage.removeItem('accessToken');
                 localStorage.removeItem('refreshToken');
@@ -94,15 +121,16 @@ apiClient.interceptors.response.use(
         }
 
         try {
-            // Gọi endpoint refresh không thông qua interceptor của apiClient để tránh loop
+            // Gọi endpoint refresh
             const response = await axios.post(`${BASE_URL}/api/auth/refresh`, {
                 refreshToken,
             });
 
             const data = response.data;
-            // Hỗ trợ cấu trúc trả về linh hoạt: { accessToken, refreshToken } hoặc { data: { accessToken, ... } }
-            const newAccessToken = data.accessToken || data.data?.accessToken;
-            const newRefreshToken = data.refreshToken || data.data?.refreshToken;
+            const target = data?.result || data?.data || data;
+
+            const newAccessToken = target.token || target.accessToken || target.access_token;
+            const newRefreshToken = target.refreshToken || target.refresh_token;
 
             if (!newAccessToken) {
                 throw new Error('No access token returned from refresh endpoint');

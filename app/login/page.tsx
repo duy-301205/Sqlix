@@ -26,14 +26,15 @@ export default function LoginPage() {
                 password,
             });
 
-            const accessToken = res.accessToken || res.data?.accessToken;
-            const refreshToken = res.refreshToken || res.data?.refreshToken;
+            // authService.login đã tự động bóc tách và lưu vào localStorage
+            const accessToken =
+                res.accessToken ||
+                (typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null);
 
-            if (accessToken) {
-                localStorage.setItem('accessToken', accessToken);
-            }
-            if (refreshToken) {
-                localStorage.setItem('refreshToken', refreshToken);
+            if (!accessToken) {
+                console.error('Không tìm thấy token hợp lệ từ server:', res);
+                setErrorMessage('Đăng nhập thành công nhưng không nhận được mã xác thực từ máy chủ.');
+                return;
             }
 
             router.push('/dashboard');

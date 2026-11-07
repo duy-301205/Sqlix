@@ -1,26 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
+import userService, { UserProfile as IServiceUserProfile, OccupationType } from '@/services/userService';
 
-export type OccupationType = 'STUDENT' | 'PROFESSIONAL' | 'OTHER';
+export type { OccupationType };
+export type UserProfile = IServiceUserProfile;
 
-export interface UserProfile {
-    id: string;
-    username: string;
-    email: string;
-    role: string;
-    full_name: string;
-    avatar_url: string;
-    bio: string;
-    occupation: OccupationType;
-    daily_target_minutes: number;
-    current_streak: number;
-    longest_streak: number;
-}
+const DEFAULT_AVATAR =
+    'https://lh3.googleusercontent.com/aida-public/AB6AXuA5s5gKn-GLKNAcWX9EFxyoYiTB5P4nSlHOI-1xfIgZeQsJ-r6VomssBqEWxVxf1x6An_7eTmstH3JQg7MKykFsZYIiXmy79nQtx5w5ttWLQIfnSMUTq90KVF2u89D6vK7mBb_dvZwHu_MhOck-Fkp_KdrFxPRZ_xmi6VeVbbXxjdepfIMNmsdpS4AyKZyt6weuqVVp_G3ciu6_0akcgzTF5K2MjVGgLmJYTT81_BgzxZc6cDDdmOla';
 
 const INITIAL_PROFILE: UserProfile = {
     id: 'usr-98421',
@@ -28,7 +19,7 @@ const INITIAL_PROFILE: UserProfile = {
     email: 'duy.hoang@sqlix.edu.vn',
     role: 'ADMIN',
     full_name: 'Duy Hoàng',
-    avatar_url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA5s5gKn-GLKNAcWX9EFxyoYiTB5P4nSlHOI-1xfIgZeQsJ-r6VomssBqEWxVxf1x6An_7eTmstH3JQg7MKykFsZYIiXmy79nQtx5w5ttWLQIfnSMUTq90KVF2u89D6vK7mBb_dvZwHu_MhOck-Fkp_KdrFxPRZ_xmi6VeVbbXxjdepfIMNmsdpS4AyKZyt6weuqVVp_G3ciu6_0akcgzTF5K2MjVGgLmJYTT81_BgzxZc6cDDdmOla',
+    avatar_url: DEFAULT_AVATAR,
     bio: 'Đam mê dữ liệu và tối ưu hóa câu truy vấn SQL hiệu năng cao. Đang học và chia sẻ kiến thức backend development.',
     occupation: 'PROFESSIONAL',
     daily_target_minutes: 30,
@@ -45,33 +36,60 @@ const SAMPLE_AVATARS = [
 ];
 
 export default function ProfilePage() {
-    // Master profile data (simulating GET /api/users/me response)
+    // Master profile data
     const [profile, setProfile] = useState<UserProfile>(INITIAL_PROFILE);
+    const [isLoading, setIsLoading] = useState(true);
 
     // Form edit states
     const [formData, setFormData] = useState({
         full_name: INITIAL_PROFILE.full_name,
-        avatar_url: INITIAL_PROFILE.avatar_url,
-        bio: INITIAL_PROFILE.bio,
+        avatar_url: INITIAL_PROFILE.avatar_url || '',
+        bio: INITIAL_PROFILE.bio || '',
         occupation: INITIAL_PROFILE.occupation,
         daily_target_minutes: INITIAL_PROFILE.daily_target_minutes,
     });
 
     const [isSaving, setIsSaving] = useState(false);
     const [saveToast, setSaveToast] = useState<string | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [copyToast, setCopyToast] = useState(false);
+
+    // Load Profile thực tế từ Backend API
+    useEffect(() => {
+        const loadProfile = async () => {
+            try {
+                const data = await userService.getCurrentUser();
+                setProfile(data);
+                setFormData({
+                    full_name: data.full_name || '',
+                    avatar_url: data.avatar_url || '',
+                    bio: data.bio || '',
+                    occupation: (data.occupation as OccupationType) || 'STUDENT',
+                    daily_target_minutes: data.daily_target_minutes || 30,
+                });
+            } catch (err: any) {
+                console.error('Lỗi khi tải thông tin hồ sơ:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadProfile();
+    }, []);
 
     // Handle Form Submit (PUT /api/users/me)
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setErrorMessage(null);
+        setSaveToast(null);
 
         if (!formData.full_name.trim()) {
-            alert('Vui lòng nhập họ và tên!');
+            setErrorMessage('Vui lòng nhập họ và tên!');
             return;
         }
 
         if (formData.daily_target_minutes < 1) {
-            alert('Mục tiêu học mỗi ngày tối thiểu là 1 phút!');
+            setErrorMessage('Mục tiêu học mỗi ngày tối thiểu là 1 phút!');
             return;
         }
 
@@ -85,36 +103,45 @@ export default function ProfilePage() {
             occupation: formData.occupation,
         };
 
-        // Simulate API PUT /api/users/me
-        console.log('[API PUT] /api/users/me payload:', updatePayload);
-
-        setTimeout(() => {
-            setProfile((prev) => ({
-                ...prev,
-                ...updatePayload,
-            }));
-            setIsSaving(false);
+        try {
+            const updated = await userService.updateProfile(updatePayload);
+            setProfile(updated);
+            setFormData({
+                full_name: updated.full_name,
+                avatar_url: updated.avatar_url || '',
+                bio: updated.bio || '',
+                occupation: (updated.occupation as OccupationType) || 'STUDENT',
+                daily_target_minutes: updated.daily_target_minutes || 30,
+            });
             setSaveToast('Cập nhật hồ sơ cá nhân thành công!');
             setTimeout(() => setSaveToast(null), 3500);
-        }, 500);
+        } catch (err: any) {
+            console.error('Lỗi khi cập nhật hồ sơ:', err);
+            const msg = err.response?.data?.message || err.response?.data?.error || 'Cập nhật thất bại. Vui lòng thử lại!';
+            setErrorMessage(msg);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     // Reset Form
     const handleReset = () => {
         setFormData({
             full_name: profile.full_name,
-            avatar_url: profile.avatar_url,
-            bio: profile.bio,
-            occupation: profile.occupation,
+            avatar_url: profile.avatar_url || '',
+            bio: profile.bio || '',
+            occupation: (profile.occupation as OccupationType) || 'STUDENT',
             daily_target_minutes: profile.daily_target_minutes,
         });
     };
 
     // Copy Account ID
     const handleCopyId = () => {
-        navigator.clipboard.writeText(profile.id);
-        setCopyToast(true);
-        setTimeout(() => setCopyToast(false), 2000);
+        if (profile.id) {
+            navigator.clipboard.writeText(String(profile.id));
+            setCopyToast(true);
+            setTimeout(() => setCopyToast(false), 2000);
+        }
     };
 
     const hasChanges =
@@ -154,6 +181,24 @@ export default function ProfilePage() {
                         </div>
                     )}
 
+                    {/* Error Toast Notification */}
+                    {errorMessage && (
+                        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm font-bold flex items-center justify-between gap-3 shadow-xs animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="flex items-center gap-2.5">
+                                <span className="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs">
+                                    ✕
+                                </span>
+                                <span>{errorMessage}</span>
+                            </div>
+                            <button
+                                onClick={() => setErrorMessage(null)}
+                                className="text-rose-600 hover:text-rose-900 text-xs font-bold cursor-pointer"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    )}
+
                     {/* Main 2-Column Responsive Layout */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                         {/* ========================================================================= */}
@@ -170,8 +215,8 @@ export default function ProfilePage() {
                                     <div className="relative mb-3.5 group">
                                         <div className="w-24 h-24 rounded-full p-1 bg-white shadow-xl ring-4 ring-blue-500/20">
                                             <Image
-                                                src={formData.avatar_url || profile.avatar_url}
-                                                alt={profile.full_name}
+                                                src={formData.avatar_url || profile.avatar_url || DEFAULT_AVATAR}
+                                                alt={profile.full_name || 'User Avatar'}
                                                 width={96}
                                                 height={96}
                                                 className="w-full h-full rounded-full object-cover"
@@ -398,7 +443,7 @@ export default function ProfilePage() {
                                     <div className="flex items-center gap-3">
                                         <div className="w-12 h-12 rounded-full overflow-hidden shrink-0 border border-slate-200 bg-slate-100">
                                             <Image
-                                                src={formData.avatar_url || profile.avatar_url}
+                                                src={formData.avatar_url || profile.avatar_url || DEFAULT_AVATAR}
                                                 alt="Avatar preview"
                                                 width={48}
                                                 height={48}

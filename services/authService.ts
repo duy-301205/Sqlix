@@ -62,8 +62,43 @@ export const authService = {
             identifier: identifier.trim(),
             password: credentials.password,
         };
-        const response = await apiClient.post<AuthResponse>('/api/auth/login', payload);
-        return response.data;
+        const response = await apiClient.post<any>('/api/auth/login', payload);
+        const raw = response.data;
+        // Backend có thể bọc trong `result` (Spring Boot ApiResponse), hoặc `data`, hoặc trả về trực tiếp
+        const target = raw?.result || raw?.data || raw;
+
+        // Trích xuất token linh hoạt từ mọi định dạng phổ biến của Spring Boot
+        const accessToken =
+            target?.accessToken ||
+            target?.token ||
+            target?.access_token ||
+            raw?.accessToken ||
+            raw?.token;
+
+        const refreshToken =
+            target?.refreshToken ||
+            target?.refresh_token ||
+            raw?.refreshToken;
+
+        // Tự động lưu ngay vào localStorage
+        if (typeof window !== 'undefined') {
+            if (accessToken) {
+                localStorage.setItem('accessToken', accessToken);
+                console.log('✅ Đã lưu accessToken vào localStorage:', accessToken.slice(0, 15) + '...');
+            } else {
+                console.warn('⚠️ Không tìm thấy accessToken trong response đăng nhập từ Backend:', raw);
+            }
+            if (refreshToken) {
+                localStorage.setItem('refreshToken', refreshToken);
+            }
+        }
+
+        return {
+            ...raw,
+            ...target,
+            accessToken,
+            refreshToken,
+        };
     },
 
     /**

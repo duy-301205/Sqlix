@@ -28,11 +28,36 @@ export default function Header({
             const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
             if (!token) return;
 
+            // Thử trích xuất nhanh thông tin từ JWT Payload làm fallback trước
+            try {
+                const parts = token.split('.');
+                if (parts.length === 3) {
+                    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+                    if (payload && (payload.sub || payload.username)) {
+                        setUser((prev) => prev || ({
+                            id: payload.userId || payload.id || payload.sub,
+                            username: payload.username || payload.sub,
+                            full_name: payload.fullName || payload.name || payload.sub,
+                            email: payload.email || '',
+                            role: payload.role || payload.roles || 'USER',
+                            current_streak: 0,
+                            longest_streak: 0,
+                            daily_target_minutes: 30,
+                            occupation: 'STUDENT',
+                        } as any));
+                    }
+                }
+            } catch (e) {
+                // bỏ qua nếu token không parse được
+            }
+
             try {
                 const userData = await userService.getCurrentUser();
-                setUser(userData);
-            } catch (error) {
-                console.error('Không thể lấy thông tin người dùng:', error);
+                if (userData) {
+                    setUser(userData);
+                }
+            } catch (error: any) {
+                console.error('Không thể lấy thông tin người dùng từ /api/users/me:', error?.response?.data || error);
             }
         };
 
