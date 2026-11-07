@@ -21,9 +21,13 @@ export default function Header({
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
+    const hasFetchedRef = useRef(false);
 
     // Lấy thông tin user hiện tại khi component mount
     useEffect(() => {
+        if (hasFetchedRef.current) return;
+        hasFetchedRef.current = true;
+
         const fetchUserData = async () => {
             const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
             if (!token) return;

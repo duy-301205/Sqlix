@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
@@ -30,6 +30,7 @@ export default function DashboardPage() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const hasFetchedRef = useRef(false);
 
     const fetchDashboardData = async () => {
         setIsLoading(true);
@@ -49,14 +50,18 @@ export default function DashboardPage() {
             if (chartRes.status === 'fulfilled') setChartData(chartRes.value);
             if (activitiesRes.status === 'fulfilled') setRecentActivities(activitiesRes.value);
 
-            // Nếu cả 4 đều thất bại thì báo lỗi
+            // Nếu cả 4 đều thất bại thì báo lỗi chi tiết từ backend
             if (
                 overviewRes.status === 'rejected' &&
                 masteryRes.status === 'rejected' &&
                 chartRes.status === 'rejected' &&
                 activitiesRes.status === 'rejected'
             ) {
-                setErrorMessage('Không thể kết nối đến máy chủ. Vui lòng thử lại sau!');
+                const firstError: any = overviewRes.reason || masteryRes.reason || chartRes.reason;
+                const data = firstError?.response?.data;
+                const backendMsg = data?.message || firstError?.message || 'Không thể tải dữ liệu bảng điều khiển.';
+                const code = data?.code;
+                setErrorMessage(code ? `[Lỗi ${code}] ${backendMsg}` : backendMsg);
             }
         } catch (err: any) {
             console.error('Lỗi khi tải dữ liệu dashboard:', err);
@@ -67,6 +72,10 @@ export default function DashboardPage() {
     };
 
     useEffect(() => {
+        // Tránh gọi lặp 2 lần do React StrictMode trong môi trường Development
+        if (hasFetchedRef.current) return;
+        hasFetchedRef.current = true;
+
         fetchDashboardData();
     }, []);
 
