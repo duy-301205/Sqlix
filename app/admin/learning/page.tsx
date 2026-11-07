@@ -78,14 +78,6 @@ export default function AdminLearningPage() {
         );
     }, [activeCategory, searchQuery]);
 
-    // Stats
-    const totalCategoriesCount = categories.length;
-    const totalLessonsCount = categories.reduce((acc, cat) => acc + cat.lessons.length, 0);
-    const totalSectionsCount = categories.reduce(
-        (acc, cat) => acc + cat.lessons.reduce((sub, les) => sub + les.sections.length, 0),
-        0
-    );
-
     const toggleLessonExpand = (lessonId: string) => {
         setExpandedLessons((prev) => ({
             ...prev,
@@ -319,272 +311,291 @@ export default function AdminLearningPage() {
     };
 
     return (
-        <div className="w-full h-full flex flex-col overflow-hidden min-w-0">
-            {/* Top Toolbar */}
-            <div className="px-6 md:px-10 py-4 bg-white border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-                <div className="flex items-center gap-4">
-                    <div>
-                        <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                            Quản Lý Lộ Trình Học Tập 📚
-                        </h2>
-                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                            <span>{totalCategoriesCount} Danh mục</span>
-                            <span>•</span>
-                            <span>{totalLessonsCount} Bài học</span>
-                            <span>•</span>
-                            <span>{totalSectionsCount} Sections</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => handleOpenCategoryModal()}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-sm shadow-blue-500/20 transition-all cursor-pointer"
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span>Thêm Danh Mục Mới</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* Split View: Left Categories Sub-Sidebar + Right Lessons Detail */}
-            <div className="flex-1 flex overflow-hidden min-w-0">
-                {/* Left 1: Category Master List */}
-                <aside className="w-80 shrink-0 h-full bg-white border-r border-slate-200/80 flex flex-col overflow-hidden">
-                    <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+        <div className="flex-1 w-full h-full flex overflow-hidden min-w-0 bg-[#f8f9ff]/40">
+            {/* ========================================================================= */}
+            {/* LEFT PANE: CATEGORY MASTER LIST                                            */}
+            {/* ========================================================================= */}
+            <aside className="w-80 lg:w-96 shrink-0 h-full bg-white border-r border-slate-200/80 flex flex-col min-w-0">
+                {/* Header of Category List */}
+                <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
                             Danh Mục Lộ Trình
                         </span>
-                        <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full">
+                        <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
                             {categories.length}
                         </span>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                        {categories.map((cat, idx) => {
-                            const isSelected = cat.id === activeCategory?.id;
-                            const lessonCount = cat.lessons.length;
-                            const sectionCount = cat.lessons.reduce((acc, l) => acc + l.sections.length, 0);
+                    <button
+                        type="button"
+                        onClick={() => handleOpenCategoryModal()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                        title="Thêm danh mục mới"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span>Thêm</span>
+                    </button>
+                </div>
 
-                            return (
-                                <div
-                                    key={cat.id}
-                                    onClick={() => setSelectedCategoryId(cat.id)}
-                                    className={`p-3.5 rounded-xl border transition-all cursor-pointer group text-left ${
-                                        isSelected
-                                            ? 'bg-blue-50/70 border-blue-500 shadow-xs ring-1 ring-blue-500/30'
-                                            : 'bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50'
-                                    }`}
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex items-center gap-2.5 min-w-0">
-                                            <span className={`w-6 h-6 rounded-lg text-xs font-black flex items-center justify-center shrink-0 ${
+                {/* Scrollable Categories List */}
+                <div className="flex-1 overflow-y-auto p-3.5 space-y-2.5">
+                    {categories.map((cat, idx) => {
+                        const isSelected = cat.id === activeCategory?.id;
+                        const lessonCount = cat.lessons.length;
+                        const sectionCount = cat.lessons.reduce((acc, l) => acc + l.sections.length, 0);
+
+                        return (
+                            <div
+                                key={cat.id}
+                                onClick={() => setSelectedCategoryId(cat.id)}
+                                className={`p-4 rounded-2xl border transition-all cursor-pointer group text-left ${
+                                    isSelected
+                                        ? 'bg-blue-50/70 border-blue-400/80 shadow-xs ring-1 ring-blue-500/20'
+                                        : 'bg-white border-slate-200/70 hover:border-slate-300 hover:bg-slate-50/60'
+                                }`}
+                            >
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <span
+                                            className={`w-6 h-6 rounded-lg text-xs font-black flex items-center justify-center shrink-0 ${
                                                 isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
-                                            }`}>
-                                                {idx + 1}
-                                            </span>
-                                            <h4 className={`text-xs font-bold truncate ${
-                                                isSelected ? 'text-blue-900' : 'text-slate-800'
-                                            }`}>
-                                                {cat.title}
-                                            </h4>
-                                        </div>
-
-                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleOpenCategoryModal(cat);
-                                                }}
-                                                className="p-1 text-slate-400 hover:text-blue-600 rounded-md hover:bg-white"
-                                                title="Sửa danh mục"
-                                            >
-                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                                </svg>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setDeleteTarget({
-                                                        type: 'CATEGORY',
-                                                        id: cat.id,
-                                                        title: cat.title,
-                                                    });
-                                                }}
-                                                className="p-1 text-slate-400 hover:text-rose-600 rounded-md hover:bg-white"
-                                                title="Xóa danh mục"
-                                            >
-                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <p className="text-[11px] text-slate-500 line-clamp-2 mt-1.5 leading-relaxed">
-                                        {cat.description}
-                                    </p>
-
-                                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100 text-[10px] font-semibold text-slate-400">
-                                        <span className="text-slate-600">📖 {lessonCount} bài học</span>
-                                        <span>•</span>
-                                        <span>📄 {sectionCount} sections</span>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </aside>
-
-                {/* Right 2: Detail Lessons & Sections */}
-                <main className="flex-1 h-full overflow-y-auto p-6 md:p-8 space-y-6 min-w-0 bg-[#f8f9ff]/40">
-                    {activeCategory ? (
-                        <div className="space-y-6 max-w-5xl mx-auto">
-                            {/* Category Banner Card */}
-                            <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
-                                            Danh Mục #{activeCategory.orderIndex}
+                                            }`}
+                                        >
+                                            {idx + 1}
                                         </span>
-                                        <h3 className="text-lg font-black text-slate-900">
-                                            {activeCategory.title}
-                                        </h3>
+                                        <h4
+                                            className={`text-xs font-bold truncate ${
+                                                isSelected ? 'text-blue-900' : 'text-slate-800'
+                                            }`}
+                                        >
+                                            {cat.title}
+                                        </h4>
                                     </div>
-                                    <p className="text-xs text-slate-500 max-w-xl">
-                                        {activeCategory.description}
-                                    </p>
+
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleOpenCategoryModal(cat);
+                                            }}
+                                            className="p-1 text-slate-400 hover:text-blue-600 rounded-md hover:bg-white transition-colors"
+                                            title="Sửa danh mục"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setDeleteTarget({
+                                                    type: 'CATEGORY',
+                                                    id: cat.id,
+                                                    title: cat.title,
+                                                });
+                                            }}
+                                            className="p-1 text-slate-400 hover:text-rose-600 rounded-md hover:bg-white transition-colors"
+                                            title="Xóa danh mục"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <button
-                                        onClick={() => handleOpenLessonModal(activeCategory.id)}
-                                        className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                                        </svg>
-                                        <span>Thêm Bài Học Mới</span>
-                                    </button>
+                                <p className="text-[11px] text-slate-500 line-clamp-2 mt-1.5 leading-relaxed">
+                                    {cat.description}
+                                </p>
+
+                                <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-slate-100 text-[10px] font-semibold text-slate-400">
+                                    <span className="text-slate-600">📚 {lessonCount} bài học</span>
+                                    <span>•</span>
+                                    <span>📄 {sectionCount} sections</span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </aside>
+
+            {/* ========================================================================= */}
+            {/* RIGHT PANE: DETAIL VIEW (ACTIVE CATEGORY + LESSONS + SECTIONS)             */}
+            {/* ========================================================================= */}
+            <main className="flex-1 h-full overflow-y-auto p-6 md:p-8 min-w-0">
+                {activeCategory ? (
+                    <div className="max-w-5xl mx-auto space-y-6">
+                        {/* Active Category Header Card */}
+                        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="space-y-1.5 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60">
+                                        Danh Mục #{activeCategory.orderIndex}
+                                    </span>
+                                    <h2 className="text-lg font-black text-slate-900 truncate">
+                                        {activeCategory.title}
+                                    </h2>
+                                </div>
+                                <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">
+                                    {activeCategory.description}
+                                </p>
+                                <div className="flex items-center gap-3 pt-1 text-[11px] font-bold text-slate-400">
+                                    <span className="text-blue-600">📚 {activeCategory.lessons.length} bài học</span>
+                                    <span>•</span>
+                                    <span>📄 {activeCategory.lessons.reduce((acc, l) => acc + l.sections.length, 0)} phần học (sections)</span>
                                 </div>
                             </div>
 
-                            {/* Search Bar in Category: Flex container không bị đè icon */}
-                            <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-white border border-slate-200/80 rounded-xl focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all shadow-2xs">
-                                <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Tìm kiếm bài học hoặc phần học (section)..."
-                                    className="w-full bg-transparent border-none p-0 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none"
-                                />
-                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => handleOpenCategoryModal(activeCategory)}
+                                    className="p-2.5 text-slate-400 hover:text-blue-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
+                                    title="Chỉnh sửa danh mục"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                </button>
 
-                            {/* Lessons List (Accordion) */}
-                            <div className="space-y-4">
-                                {filteredLessons.length === 0 ? (
-                                    <div className="bg-white rounded-2xl p-12 text-center text-slate-400 text-xs border border-dashed border-slate-200">
-                                        Chưa có bài học nào trong danh mục này. Bấm &quot;Thêm Bài Học Mới&quot; để tạo bài học đầu tiên.
-                                    </div>
-                                ) : (
-                                    filteredLessons.map((lesson, lessonIndex) => {
-                                        const isExpanded = !!expandedLessons[lesson.id];
-                                        return (
+                                <button
+                                    onClick={() => handleOpenLessonModal(activeCategory.id)}
+                                    className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    <span>Thêm Bài Học Mới</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Search Input Bar */}
+                        <div className="w-full max-w-md flex items-center gap-2.5 px-3.5 py-2.5 bg-white border border-slate-200/80 rounded-xl focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all shadow-2xs">
+                            <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Tìm kiếm bài học hoặc phần học (section)..."
+                                className="w-full bg-transparent border-none p-0 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                                >
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Lessons List (Accordion) */}
+                        <div className="space-y-4">
+                            {filteredLessons.length === 0 ? (
+                                <div className="bg-white rounded-2xl p-12 text-center text-slate-400 text-xs border border-dashed border-slate-200">
+                                    Chưa có bài học nào trong danh mục này. Bấm &quot;Thêm Bài Học Mới&quot; để tạo bài học đầu tiên.
+                                </div>
+                            ) : (
+                                filteredLessons.map((lesson, lessonIndex) => {
+                                    const isExpanded = !!expandedLessons[lesson.id];
+                                    return (
+                                        <div
+                                            key={lesson.id}
+                                            className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs hover:border-slate-300 transition-all"
+                                        >
+                                            {/* Lesson Header */}
                                             <div
-                                                key={lesson.id}
-                                                className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs hover:border-slate-300 transition-all"
+                                                onClick={() => toggleLessonExpand(lesson.id)}
+                                                className="p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer select-none bg-slate-50/40 hover:bg-slate-50 transition-colors"
                                             >
-                                                {/* Lesson Header */}
-                                                <div
-                                                    onClick={() => toggleLessonExpand(lesson.id)}
-                                                    className="p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer select-none bg-slate-50/50 hover:bg-slate-50 transition-colors"
-                                                >
-                                                    <div className="flex items-center gap-3.5 min-w-0">
-                                                        <span className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 text-xs font-black flex items-center justify-center shrink-0">
-                                                            {lessonIndex + 1}
-                                                        </span>
-                                                        <div className="min-w-0">
-                                                            <div className="flex items-center gap-2">
-                                                                <h4 className="text-sm font-bold text-slate-900 truncate">
-                                                                    {lesson.title}
-                                                                </h4>
-                                                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                                <div className="flex items-center gap-3.5 min-w-0">
+                                                    <span className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 text-xs font-black flex items-center justify-center shrink-0">
+                                                        {lessonIndex + 1}
+                                                    </span>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <h4 className="text-sm font-bold text-slate-900 truncate">
+                                                                {lesson.title}
+                                                            </h4>
+                                                            <span
+                                                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                                                                     lesson.difficulty === 'BEGINNER'
-                                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
                                                                         : lesson.difficulty === 'INTERMEDIATE'
-                                                                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                                                        : 'bg-rose-50 text-rose-700 border border-rose-200'
-                                                                }`}>
-                                                                    {lesson.difficulty}
+                                                                        ? 'bg-amber-50 text-amber-700 border border-amber-200/70'
+                                                                        : 'bg-rose-50 text-rose-700 border border-rose-200/70'
+                                                                }`}
+                                                            >
+                                                                {lesson.difficulty}
+                                                            </span>
+                                                            {!lesson.isPublished && (
+                                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                                                                    Bản nháp
                                                                 </span>
-                                                                {!lesson.isPublished && (
-                                                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-200 text-slate-600">
-                                                                        Bản nháp
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <p className="text-xs text-slate-500 truncate mt-0.5">
-                                                                {lesson.description}
-                                                            </p>
+                                                            )}
                                                         </div>
+                                                        <p className="text-xs text-slate-500 truncate mt-0.5">
+                                                            {lesson.sections.length} phần học • {lesson.description}
+                                                        </p>
                                                     </div>
+                                                </div>
 
-                                                    <div className="flex items-center gap-2 shrink-0">
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleOpenSectionModal(lesson.id);
-                                                            }}
-                                                            className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-600 border border-slate-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                                                        >
-                                                            + Thêm Section
-                                                        </button>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleOpenSectionModal(lesson.id);
+                                                        }}
+                                                        className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/60 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                                                    >
+                                                        <span>+ Section</span>
+                                                    </button>
 
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleOpenLessonModal(activeCategory.id, lesson);
-                                                            }}
-                                                            className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-white transition-colors"
-                                                            title="Sửa bài học"
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                                            </svg>
-                                                        </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleOpenLessonModal(activeCategory.id, lesson);
+                                                        }}
+                                                        className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-white transition-colors"
+                                                        title="Sửa bài học"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                        </svg>
+                                                    </button>
 
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setDeleteTarget({
-                                                                    type: 'LESSON',
-                                                                    id: lesson.id,
-                                                                    title: lesson.title,
-                                                                    parentId: activeCategory.id,
-                                                                });
-                                                            }}
-                                                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-white transition-colors"
-                                                            title="Xóa bài học"
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                            </svg>
-                                                        </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setDeleteTarget({
+                                                                type: 'LESSON',
+                                                                id: lesson.id,
+                                                                title: lesson.title,
+                                                                parentId: activeCategory.id,
+                                                            });
+                                                        }}
+                                                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-white transition-colors"
+                                                        title="Xóa bài học"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
 
+                                                    <div className="p-1.5 text-slate-400">
                                                         <svg
-                                                            className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                                                            className={`w-4 h-4 transition-transform duration-200 ${
                                                                 isExpanded ? 'rotate-180' : ''
                                                             }`}
                                                             fill="none"
@@ -595,92 +606,98 @@ export default function AdminLearningPage() {
                                                         </svg>
                                                     </div>
                                                 </div>
+                                            </div>
 
-                                                {/* Sections Content Drawer */}
-                                                {isExpanded && (
-                                                    <div className="p-4 bg-white border-t border-slate-100 space-y-2">
-                                                        {lesson.sections.length === 0 ? (
-                                                            <p className="text-xs text-slate-400 italic py-2 pl-2">
-                                                                Chưa có section nào. Bấm &quot;+ Thêm Section&quot; ở trên để tạo nội dung học.
-                                                            </p>
-                                                        ) : (
-                                                            lesson.sections.map((section, secIdx) => (
-                                                                <div
-                                                                    key={section.id}
-                                                                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50/70 border border-slate-200/70 hover:border-slate-300 transition-colors"
-                                                                >
-                                                                    <div className="flex items-center gap-3 min-w-0">
-                                                                        <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">
-                                                                            {secIdx + 1}
-                                                                        </span>
-                                                                        <div className="min-w-0">
-                                                                            <h5 className="text-xs font-bold text-slate-800 truncate">
-                                                                                {section.title}
-                                                                            </h5>
-                                                                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
-                                                                                <span>⏱️ {section.durationMinutes} phút</span>
-                                                                                {section.sampleQuery && (
-                                                                                    <>
-                                                                                        <span>•</span>
-                                                                                        <span className="text-blue-600 font-mono text-[10px] bg-blue-50 px-1.5 py-0.5 rounded">
-                                                                                            SQL Query
-                                                                                        </span>
-                                                                                    </>
-                                                                                )}
-                                                                            </div>
+                                            {/* Sections Drawer */}
+                                            {isExpanded && (
+                                                <div className="p-4 bg-slate-50/50 border-t border-slate-100 space-y-2.5">
+                                                    {lesson.sections.length === 0 ? (
+                                                        <p className="text-xs text-slate-400 italic py-2 pl-2">
+                                                            Chưa có section nào. Bấm &quot;+ Section&quot; ở trên để tạo nội dung học.
+                                                        </p>
+                                                    ) : (
+                                                        lesson.sections.map((section, secIdx) => (
+                                                            <div
+                                                                key={section.id}
+                                                                className="flex items-center justify-between p-3.5 rounded-xl bg-white border border-slate-200/70 hover:border-blue-300 transition-all shadow-2xs"
+                                                            >
+                                                                <div className="flex items-center gap-3 min-w-0">
+                                                                    <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
+                                                                        {secIdx + 1}
+                                                                    </span>
+                                                                    <div className="min-w-0">
+                                                                        <h5 className="text-xs font-bold text-slate-800 truncate">
+                                                                            {section.title}
+                                                                        </h5>
+                                                                        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
+                                                                            <span>⏱️ {section.durationMinutes} phút</span>
+                                                                            {section.sampleQuery && (
+                                                                                <>
+                                                                                    <span>•</span>
+                                                                                    <span className="text-blue-600 font-mono text-[9px] bg-blue-50 px-1.5 py-0.5 rounded font-bold border border-blue-100">
+                                                                                        SQL Query
+                                                                                    </span>
+                                                                                </>
+                                                                            )}
                                                                         </div>
                                                                     </div>
-
-                                                                    <div className="flex items-center gap-1 shrink-0">
-                                                                        <button
-                                                                            onClick={() => handleOpenSectionModal(lesson.id, section)}
-                                                                            className="p-1 text-slate-400 hover:text-blue-600 rounded-md hover:bg-slate-200 transition-colors"
-                                                                            title="Sửa section"
-                                                                        >
-                                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                                                            </svg>
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() =>
-                                                                                setDeleteTarget({
-                                                                                    type: 'SECTION',
-                                                                                    id: section.id,
-                                                                                    title: section.title,
-                                                                                    parentId: lesson.id,
-                                                                                })
-                                                                            }
-                                                                            className="p-1 text-slate-400 hover:text-rose-600 rounded-md hover:bg-slate-200 transition-colors"
-                                                                            title="Xóa section"
-                                                                        >
-                                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                                            </svg>
-                                                                        </button>
-                                                                    </div>
                                                                 </div>
-                                                            ))
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="bg-white rounded-2xl p-12 text-center text-slate-400 border border-slate-200/80">
-                            Vui lòng chọn hoặc tạo một Danh mục lộ trình ở cột bên trái.
-                        </div>
-                    )}
-                </main>
-            </div>
 
-            {/* ================= Modal: Create / Edit Category (Fixed Header & Footer) ================= */}
+                                                                <div className="flex items-center gap-1 shrink-0">
+                                                                    <button
+                                                                        onClick={() => handleOpenSectionModal(lesson.id, section)}
+                                                                        className="p-1.5 text-slate-400 hover:text-blue-600 rounded-md hover:bg-slate-100 transition-colors"
+                                                                        title="Sửa section"
+                                                                    >
+                                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                                        </svg>
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() =>
+                                                                            setDeleteTarget({
+                                                                                type: 'SECTION',
+                                                                                id: section.id,
+                                                                                title: section.title,
+                                                                                parentId: lesson.id,
+                                                                            })
+                                                                        }
+                                                                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md hover:bg-slate-100 transition-colors"
+                                                                        title="Xóa section"
+                                                                    >
+                                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                        </svg>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-2xl p-12 text-center text-slate-400 border border-slate-200/80">
+                        Vui lòng chọn hoặc tạo một Danh mục lộ trình ở cột bên trái.
+                    </div>
+                )}
+            </main>
+
+            {/* ================= Modal: Create / Edit Category ================= */}
             {activeModal === 'CATEGORY' && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/50 backdrop-blur-xs">
-                    <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 flex flex-col max-h-[88vh] overflow-hidden">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+                    <div
+                        className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border-2 border-slate-300/80 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+                        style={{ height: '70vh', maxHeight: '70vh' }}
+                    >
+                        {/* Top Gradient Bar */}
+                        <div className="h-1.5 w-full bg-linear-to-r from-blue-600 via-indigo-600 to-sky-500 shrink-0" />
+
                         {/* Fixed Header */}
                         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
                             <div>
@@ -773,10 +790,16 @@ export default function AdminLearningPage() {
                 </div>
             )}
 
-            {/* ================= Modal: Create / Edit Lesson (Fixed Header & Footer) ================= */}
+            {/* ================= Modal: Create / Edit Lesson ================= */}
             {activeModal === 'LESSON' && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/50 backdrop-blur-xs">
-                    <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 flex flex-col max-h-[88vh] overflow-hidden">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+                    <div
+                        className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border-2 border-slate-300/80 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+                        style={{ height: '78vh', maxHeight: '78vh' }}
+                    >
+                        {/* Top Gradient Bar */}
+                        <div className="h-1.5 w-full bg-linear-to-r from-blue-600 via-indigo-600 to-sky-500 shrink-0" />
+
                         {/* Fixed Header */}
                         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
                             <div>
@@ -849,13 +872,13 @@ export default function AdminLearningPage() {
                                     />
                                 </div>
 
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 pt-1">
                                     <input
                                         type="checkbox"
                                         id="publishCheck"
                                         checked={lessonForm.isPublished}
                                         onChange={(e) => setLessonForm({ ...lessonForm, isPublished: e.target.checked })}
-                                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
                                     />
                                     <label htmlFor="publishCheck" className="text-xs font-bold text-slate-700 cursor-pointer">
                                         Xuất bản ngay (Hiển thị cho học viên trên trang học tập)
@@ -874,7 +897,7 @@ export default function AdminLearningPage() {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
+                                    className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer"
                                 >
                                     {editingTarget ? 'Lưu thay đổi' : 'Tạo bài học'}
                                 </button>
@@ -884,10 +907,16 @@ export default function AdminLearningPage() {
                 </div>
             )}
 
-            {/* ================= Modal: Create / Edit Section (Fixed Header & Footer) ================= */}
+            {/* ================= Modal: Create / Edit Section ================= */}
             {activeModal === 'SECTION' && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/50 backdrop-blur-xs">
-                    <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 flex flex-col max-h-[88vh] overflow-hidden">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+                    <div
+                        className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border-2 border-slate-300/80 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+                        style={{ height: '90vh', maxHeight: '90vh' }}
+                    >
+                        {/* Top Gradient Bar */}
+                        <div className="h-1.5 w-full bg-linear-to-r from-blue-600 via-indigo-600 to-sky-500 shrink-0" />
+
                         {/* Fixed Header */}
                         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
                             <div>
@@ -934,7 +963,7 @@ export default function AdminLearningPage() {
                                             min="1"
                                             value={sectionForm.durationMinutes}
                                             onChange={(e) => setSectionForm({ ...sectionForm, durationMinutes: Number(e.target.value) })}
-                                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                         />
                                     </div>
                                     <div>
@@ -946,7 +975,7 @@ export default function AdminLearningPage() {
                                             min="1"
                                             value={sectionForm.orderIndex}
                                             onChange={(e) => setSectionForm({ ...sectionForm, orderIndex: Number(e.target.value) })}
-                                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                         />
                                     </div>
                                 </div>
@@ -1014,8 +1043,8 @@ export default function AdminLearningPage() {
 
             {/* ================= Delete Confirmation Dialog ================= */}
             {deleteTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+                    <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border-2 border-slate-300/80 animate-in zoom-in-95 duration-150">
                         <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />

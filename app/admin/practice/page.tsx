@@ -314,74 +314,73 @@ export default function AdminPracticePage() {
             {/* ========================================================================= */}
             {!selectedDbId ? (
                 <>
-                    {/* Top Bar */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                                Kho Luyện Tập & Cơ Sở Dữ Liệu 🗄️
-                            </h2>
-                            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                                Quản lý các Cơ sở dữ liệu mẫu (Sandbox DDL) và danh sách bài tập SQL thực hành
-                            </p>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => handleOpenDbModal()}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                                </svg>
-                                <span>Thêm Database Mới</span>
-                            </button>
-                        </div>
+                    {/* Top Action Bar */}
+                    <div className="flex items-center justify-end">
+                        <button
+                            onClick={() => handleOpenDbModal()}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span>Thêm Database Mới</span>
+                        </button>
                     </div>
 
-                    {/* Stat Badges */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex items-center gap-4">
-                            <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {/* Compact Stat Badges (Side-by-side in 1 Row) */}
+                    <div className="grid grid-cols-3 gap-3.5">
+                        <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
+                            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                                 </svg>
                             </div>
-                            <div>
-                                <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Cơ sở dữ liệu mẫu</span>
-                                <p className="text-2xl font-black text-slate-900">{databases.length} CSDL</p>
+                            <div className="min-w-0">
+                                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block truncate">
+                                    Cơ sở dữ liệu mẫu
+                                </span>
+                                <p className="text-lg sm:text-xl font-black text-slate-900 mt-0.5 truncate">
+                                    {databases.length} CSDL
+                                </p>
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex items-center gap-4">
-                            <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                                 </svg>
                             </div>
-                            <div>
-                                <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Tổng số Bài tập SQL</span>
-                                <p className="text-2xl font-black text-slate-900">{totalExercisesCount} bài</p>
+                            <div className="min-w-0">
+                                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block truncate">
+                                    Tổng số Bài tập SQL
+                                </span>
+                                <p className="text-lg sm:text-xl font-black text-slate-900 mt-0.5 truncate">
+                                    {totalExercisesCount} bài
+                                </p>
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex items-center gap-4">
-                            <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
+                            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                 </svg>
                             </div>
-                            <div>
-                                <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Tổng số Bảng Schema</span>
-                                <p className="text-2xl font-black text-slate-900">
+                            <div className="min-w-0">
+                                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block truncate">
+                                    Tổng số Bảng Schema
+                                </span>
+                                <p className="text-lg sm:text-xl font-black text-slate-900 mt-0.5 truncate">
                                     {databases.reduce((sum, d) => sum + d.tableCount, 0)} Tables
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    {/* Filter & Search Bar: Flex Layout không bao giờ bị đè icon */}
-                    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="flex-1 w-full sm:w-auto flex items-center gap-3 px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus-within:bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+                    {/* Filter & Search Bar: Thu gọn ô tìm kiếm và đặt bộ lọc ngay cạnh */}
+                    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs flex flex-wrap items-center gap-4">
+                        <div className="w-full sm:w-80 md:w-96 flex items-center gap-3 px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus-within:bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
                             <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
@@ -394,7 +393,7 @@ export default function AdminPracticePage() {
                             />
                         </div>
 
-                        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                        <div className="flex items-center gap-2">
                             <span className="text-xs font-semibold text-slate-500">Hệ quản trị:</span>
                             <select
                                 value={dialectFilter}

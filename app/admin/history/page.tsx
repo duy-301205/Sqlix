@@ -213,31 +213,17 @@ export default function AdminHistoryPage() {
 
     return (
         <main className="flex-1 overflow-y-auto px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8 min-w-0">
-            {/* Header Banner */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                        <span>Lịch Sử Thi Toàn Hệ Thống</span>
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
-                            CMS Admin
-                        </span>
-                    </h1>
-                    <p className="text-slate-500 text-xs sm:text-sm mt-1.5 max-w-2xl leading-relaxed">
-                        Theo dõi, thống kê và giám sát toàn diện kết quả các phiên thi thử SQL của tất cả học viên trong hệ thống SQLix.
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-3 shrink-0">
-                    <button
-                        onClick={handleExportReport}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 rounded-xl font-bold text-xs sm:text-sm shadow-2xs hover:shadow-xs transition-all cursor-pointer"
-                    >
-                        <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <span>Xuất Báo Cáo (CSV)</span>
-                    </button>
-                </div>
+            {/* Top Action Bar */}
+            <div className="flex items-center justify-end">
+                <button
+                    onClick={handleExportReport}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 rounded-xl font-bold text-xs sm:text-sm shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+                >
+                    <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Xuất Báo Cáo (CSV)</span>
+                </button>
             </div>
 
             {/* KPI Summary Cards */}
