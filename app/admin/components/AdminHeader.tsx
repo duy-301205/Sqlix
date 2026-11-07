@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 export default function AdminHeader() {
@@ -79,23 +80,29 @@ export default function AdminHeader() {
                     <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
                 </button>
 
-                {/* Admin User Profile */}
-                <div className="flex items-center gap-2.5 p-1 sm:pr-3 rounded-full bg-white border border-slate-200/80 shadow-xs cursor-pointer hover:bg-slate-50 transition-colors">
+                {/* Admin User Profile (Navigates to /profile) */}
+                <Link
+                    href="/profile"
+                    className="flex items-center gap-2.5 p-1 sm:pr-3 rounded-full bg-white border border-slate-200/80 shadow-xs cursor-pointer hover:bg-slate-50 hover:border-blue-300 transition-all group"
+                    title="Xem và chỉnh sửa hồ sơ cá nhân"
+                >
                     <Image
                         alt="Avatar Admin"
                         width={36}
                         height={36}
-                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover"
+                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover group-hover:ring-2 group-hover:ring-blue-500/30 transition-all"
                         src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5s5gKn-GLKNAcWX9EFxyoYiTB5P4nSlHOI-1xfIgZeQsJ-r6VomssBqEWxVxf1x6An_7eTmstH3JQg7MKykFsZYIiXmy79nQtx5w5ttWLQIfnSMUTq90KVF2u89D6vK7mBb_dvZwHu_MhOck-Fkp_KdrFxPRZ_xmi6VeVbbXxjdepfIMNmsdpS4AyKZyt6weuqVVp_G3ciu6_0akcgzTF5K2MjVGgLmJYTT81_BgzxZc6cDDdmOla"
                     />
                     <div className="hidden sm:flex flex-col text-left">
-                        <span className="text-xs sm:text-sm font-bold text-slate-800 leading-tight">Duy Hoàng</span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-800 leading-tight group-hover:text-blue-600 transition-colors">
+                            Duy Hoàng
+                        </span>
                         <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">Super Admin</span>
                     </div>
-                    <svg className="w-4 h-4 text-slate-400 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-slate-400 hidden sm:block group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                     </svg>
-                </div>
+                </Link>
             </div>
         </header>
     );

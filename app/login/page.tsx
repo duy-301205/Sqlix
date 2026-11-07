@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import authService from '@/services/authService';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -10,17 +11,53 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!email || !password || isLoading) return;
 
         setIsLoading(true);
+        setErrorMessage('');
 
-        // Giả lập xử lý đăng nhập (1.2s) rồi chuyển hướng
-        setTimeout(() => {
+        try {
+            const res = await authService.login({
+                identifier: email.trim(),
+                password,
+            });
+
+            const accessToken = res.accessToken || res.data?.accessToken;
+            const refreshToken = res.refreshToken || res.data?.refreshToken;
+
+            if (accessToken) {
+                localStorage.setItem('accessToken', accessToken);
+            }
+            if (refreshToken) {
+                localStorage.setItem('refreshToken', refreshToken);
+            }
+
             router.push('/dashboard');
-        }, 1200);
+        } catch (err: any) {
+            console.error('Login error:', err);
+            const data = err.response?.data;
+            let msg = 'Tên đăng nhập/email hoặc mật khẩu không chính xác!';
+
+            if (data?.message) {
+                msg = data.message;
+            } else if (data?.errors) {
+                if (Array.isArray(data.errors)) {
+                    msg = data.errors.map((e: any) => e.defaultMessage || e.message || e).join(', ');
+                } else if (typeof data.errors === 'object') {
+                    msg = Object.values(data.errors).join(', ');
+                }
+            } else if (data?.error) {
+                msg = data.error;
+            }
+
+            setErrorMessage(msg);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -153,6 +190,16 @@ export default function LoginPage() {
                             Chào mừng bạn quay trở lại!
                         </p>
                     </div>
+
+                    {/* Error Banner */}
+                    {errorMessage && (
+                        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 animate-in fade-in duration-200">
+                            <svg className="h-4 w-4 shrink-0 mt-0.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="flex-1 font-medium">{errorMessage}</span>
+                        </div>
+                    )}
 
                     {/* Form */}
                     <form onSubmit={handleSubmit} className="space-y-4">
