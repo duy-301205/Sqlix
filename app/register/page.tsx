@@ -2,10 +2,94 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import authService, { Occupation } from '@/services/authService';
 
 export default function RegisterPage() {
+    const router = useRouter();
+    const [fullName, setFullName] = useState('');
+    const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [occupation, setOccupation] = useState<Occupation>('STUDENT');
+    const [agreeTerms, setAgreeTerms] = useState(true);
+
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        if (!agreeTerms) {
+            setErrorMessage('Vui lòng đồng ý với Điều khoản và Chính sách để tiếp tục.');
+            return;
+        }
+
+        const trimmedUsername = username.trim();
+        if (trimmedUsername.length < 3 || trimmedUsername.length > 50) {
+            setErrorMessage('Tên đăng nhập phải từ 3 đến 50 ký tự.');
+            return;
+        }
+
+        if (/\s/.test(trimmedUsername)) {
+            setErrorMessage('Tên đăng nhập không được chứa khoảng trắng.');
+            return;
+        }
+
+        if (password.length < 8) {
+            setErrorMessage('Mật khẩu phải có độ dài tối thiểu 8 ký tự.');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            setErrorMessage('Mật khẩu và xác nhận mật khẩu không trùng khớp.');
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            await authService.register({
+                fullName: fullName.trim(),
+                username: trimmedUsername,
+                email: email.trim(),
+                password,
+                occupation,
+                termsAccepted: agreeTerms,
+            });
+
+            setSuccessMessage('Đăng ký tài khoản thành công! Đang chuyển hướng sang trang đăng nhập...');
+            setTimeout(() => {
+                router.push('/login?registered=true');
+            }, 1500);
+        } catch (err: any) {
+            console.error('Registration error:', err);
+            const data = err.response?.data;
+            let msg = 'Đăng ký không thành công. Tên đăng nhập hoặc email có thể đã được sử dụng.';
+
+            if (data?.message) {
+                msg = data.message;
+            } else if (data?.errors) {
+                if (Array.isArray(data.errors)) {
+                    msg = data.errors.map((e: any) => e.defaultMessage || e.message || e).join(', ');
+                } else if (typeof data.errors === 'object') {
+                    msg = Object.values(data.errors).join(', ');
+                }
+            } else if (data?.error) {
+                msg = data.error;
+            }
+
+            setErrorMessage(msg);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-slate-100 text-slate-800 antialiased grid grid-cols-1 lg:grid-cols-12">
@@ -133,7 +217,27 @@ export default function RegisterPage() {
                         <p className="text-xs text-slate-500 mt-0.5">Tạo tài khoản để bắt đầu học SQL ngay hôm nay</p>
                     </div>
 
-                    <form onSubmit={(e) => e.preventDefault()} className="space-y-3">
+                    {/* Error Banner */}
+                    {errorMessage && (
+                        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 animate-in fade-in duration-200">
+                            <svg className="h-4 w-4 shrink-0 mt-0.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="flex-1 font-medium">{errorMessage}</span>
+                        </div>
+                    )}
+
+                    {/* Success Banner */}
+                    {successMessage && (
+                        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700 animate-in fade-in duration-200">
+                            <svg className="h-4 w-4 shrink-0 mt-0.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="flex-1 font-medium">{successMessage}</span>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmit} className="space-y-3">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="fullName">
@@ -144,8 +248,11 @@ export default function RegisterPage() {
                                     name="fullName"
                                     type="text"
                                     required
+                                    disabled={isLoading}
+                                    value={fullName}
+                                    onChange={(e) => setFullName(e.target.value)}
                                     placeholder="Nguyễn Văn A"
-                                    className="block w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-xs sm:text-sm transition-all outline-none"
+                                    className="block w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-xs sm:text-sm transition-all outline-none disabled:bg-slate-50 disabled:text-slate-400"
                                 />
                             </div>
 
@@ -158,8 +265,11 @@ export default function RegisterPage() {
                                     name="username"
                                     type="text"
                                     required
+                                    disabled={isLoading}
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
                                     placeholder="username123"
-                                    className="block w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-xs sm:text-sm transition-all outline-none"
+                                    className="block w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-xs sm:text-sm transition-all outline-none disabled:bg-slate-50 disabled:text-slate-400"
                                 />
                             </div>
                         </div>
@@ -173,8 +283,11 @@ export default function RegisterPage() {
                                 name="email"
                                 type="email"
                                 required
+                                disabled={isLoading}
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                                 placeholder="email@example.com"
-                                className="block w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-xs sm:text-sm transition-all outline-none"
+                                className="block w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-xs sm:text-sm transition-all outline-none disabled:bg-slate-50 disabled:text-slate-400"
                             />
                         </div>
 
@@ -185,9 +298,9 @@ export default function RegisterPage() {
                                 </label>
                                 <div className="flex items-center gap-1">
                                     <span className="text-[10px] text-slate-400 mr-0.5">Độ mạnh:</span>
-                                    <div className="w-4 h-1 rounded-full bg-emerald-500"></div>
-                                    <div className="w-4 h-1 rounded-full bg-emerald-500"></div>
-                                    <div className="w-4 h-1 rounded-full bg-slate-200"></div>
+                                    <div className={`w-4 h-1 rounded-full ${password.length >= 8 ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
+                                    <div className={`w-4 h-1 rounded-full ${password.length >= 10 ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
+                                    <div className={`w-4 h-1 rounded-full ${password.length >= 12 ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
                                 </div>
                             </div>
                             <div className="relative">
@@ -196,13 +309,17 @@ export default function RegisterPage() {
                                     name="password"
                                     type={showPassword ? 'text' : 'password'}
                                     required
-                                    placeholder="••••••••"
-                                    className="block w-full px-3 pr-9 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-xs sm:text-sm transition-all outline-none"
+                                    disabled={isLoading}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Tối thiểu 8 ký tự"
+                                    className="block w-full px-3 pr-9 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-xs sm:text-sm transition-all outline-none disabled:bg-slate-50 disabled:text-slate-400"
                                 />
                                 <button
                                     type="button"
+                                    disabled={isLoading}
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer disabled:cursor-not-allowed"
                                 >
                                     {showPassword ? (
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -228,13 +345,17 @@ export default function RegisterPage() {
                                     name="confirmPassword"
                                     type={showConfirmPassword ? 'text' : 'password'}
                                     required
+                                    disabled={isLoading}
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
                                     placeholder="••••••••"
-                                    className="block w-full px-3 pr-9 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-xs sm:text-sm transition-all outline-none"
+                                    className="block w-full px-3 pr-9 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-xs sm:text-sm transition-all outline-none disabled:bg-slate-50 disabled:text-slate-400"
                                 />
                                 <button
                                     type="button"
+                                    disabled={isLoading}
                                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer disabled:cursor-not-allowed"
                                 >
                                     {showConfirmPassword ? (
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -252,17 +373,19 @@ export default function RegisterPage() {
 
                         <div>
                             <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="role">
-                                Vai trò
+                                Vai trò / Nghề nghiệp
                             </label>
                             <select
                                 id="role"
                                 name="role"
-                                defaultValue="student"
-                                className="block w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-xs sm:text-sm bg-white transition-all cursor-pointer outline-none"
+                                disabled={isLoading}
+                                value={occupation}
+                                onChange={(e) => setOccupation(e.target.value as Occupation)}
+                                className="block w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-xs sm:text-sm bg-white transition-all cursor-pointer outline-none disabled:bg-slate-50 disabled:text-slate-400"
                             >
-                                <option value="student">Sinh viên</option>
-                                <option value="professional">Người đi làm</option>
-                                <option value="other">Khác</option>
+                                <option value="STUDENT">Sinh viên</option>
+                                <option value="PROFESSIONAL">Người đi làm</option>
+                                <option value="OTHER">Khác</option>
                             </select>
                         </div>
 
@@ -271,7 +394,9 @@ export default function RegisterPage() {
                                 id="terms"
                                 name="terms"
                                 type="checkbox"
-                                defaultChecked
+                                disabled={isLoading}
+                                checked={agreeTerms}
+                                onChange={(e) => setAgreeTerms(e.target.checked)}
                                 className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer mt-0.5 shrink-0"
                             />
                             <label className="ml-2 text-xs text-slate-600 cursor-pointer leading-tight" htmlFor="terms">
@@ -288,9 +413,20 @@ export default function RegisterPage() {
 
                         <button
                             type="submit"
-                            className="w-full py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 cursor-pointer mt-2"
+                            disabled={isLoading}
+                            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 cursor-pointer mt-2 disabled:opacity-75 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                         >
-                            Đăng ký
+                            {isLoading ? (
+                                <>
+                                    <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span>Đang đăng ký tài khoản...</span>
+                                </>
+                            ) : (
+                                <span>Đăng ký</span>
+                            )}
                         </button>
                     </form>
 
