@@ -157,28 +157,17 @@ export default function AdminUsersPage() {
 
     return (
         <main className="flex-1 overflow-y-auto px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8 min-w-0">
-            {/* ================= 1. Top Bar: Title & Create Button ================= */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                        Quản Lý Người Dùng 👥
-                    </h2>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                        Quản lý phân quyền, theo dõi hoạt động học tập và trạng thái tài khoản
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={handleOpenCreateModal}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span>Thêm thành viên mới</span>
-                    </button>
-                </div>
+            {/* ================= 1. Top Action Bar ================= */}
+            <div className="flex items-center justify-end">
+                <button
+                    onClick={handleOpenCreateModal}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Thêm thành viên mới</span>
+                </button>
             </div>
 
             {/* ================= 2. 4 Mini Stat Badges ================= */}

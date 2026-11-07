@@ -23,50 +23,39 @@ export default function AdminDashboardPage() {
 
     return (
         <main className="flex-1 overflow-y-auto px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8 min-w-0">
-            {/* ================= 1. Top Bar: Overview Greeting & Action Pills ================= */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                        Tổng Quan Hệ Thống 📊
-                    </h2>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                        Theo dõi thời gian thực số lượng học viên, bài tập và phiên thi thử
-                    </p>
+            {/* ================= 1. Top Action Bar: Time Range Pills & Refresh ================= */}
+            <div className="flex items-center justify-end gap-3">
+                {/* Time Range Pills */}
+                <div className="flex items-center p-1 bg-white rounded-full border border-slate-200/80 shadow-xs">
+                    {(['7d', '30d', 'all'] as const).map((range) => (
+                        <button
+                            key={range}
+                            onClick={() => {
+                                setTimeRange(range);
+                                console.log(`Selected range: ${range}`);
+                            }}
+                            className={`px-3.5 py-1 text-xs font-bold rounded-full transition-all cursor-pointer ${
+                                timeRange === range
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                            {range === '7d' ? '7 Ngày' : range === '30d' ? '30 Ngày' : 'Tất cả'}
+                        </button>
+                    ))}
                 </div>
 
-                <div className="flex items-center gap-3">
-                    {/* Time Range Pills */}
-                    <div className="flex items-center p-1 bg-white rounded-full border border-slate-200/80 shadow-xs">
-                        {(['7d', '30d', 'all'] as const).map((range) => (
-                            <button
-                                key={range}
-                                onClick={() => {
-                                    setTimeRange(range);
-                                    console.log(`Selected range: ${range}`);
-                                }}
-                                className={`px-3.5 py-1 text-xs font-bold rounded-full transition-all cursor-pointer ${
-                                    timeRange === range
-                                        ? 'bg-blue-600 text-white shadow-xs'
-                                        : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                            >
-                                {range === '7d' ? '7 Ngày' : range === '30d' ? '30 Ngày' : 'Tất cả'}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Refresh Button */}
-                    <button
-                        onClick={handleRefreshStats}
-                        disabled={isRefreshing}
-                        className="flex items-center gap-2 px-3.5 py-2 bg-white rounded-full border border-slate-200/80 shadow-xs text-xs font-bold text-slate-700 hover:text-blue-600 hover:border-blue-300 transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                        <svg className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        <span className="hidden sm:inline">{isRefreshing ? 'Đang tải...' : 'Làm mới'}</span>
-                    </button>
-                </div>
+                {/* Refresh Button */}
+                <button
+                    onClick={handleRefreshStats}
+                    disabled={isRefreshing}
+                    className="flex items-center gap-2 px-3.5 py-2 bg-white rounded-full border border-slate-200/80 shadow-xs text-xs font-bold text-slate-700 hover:text-blue-600 hover:border-blue-300 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                    <svg className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span className="hidden sm:inline">{isRefreshing ? 'Đang tải...' : 'Làm mới'}</span>
+                </button>
             </div>
 
             {/* ================= 2. Metric Cards (4 Columns) Đồng bộ hoàn toàn Dashboard ================= */}

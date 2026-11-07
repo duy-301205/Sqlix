@@ -414,31 +414,17 @@ export default function AdminMockTestsPage() {
             {/* ========================================================================= */}
             {!selectedTestId ? (
                 <>
-                    {/* Header Banner */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                                <span>Quản Lý Đề Thi Thử</span>
-                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
-                                    CMS Admin
-                                </span>
-                            </h1>
-                            <p className="text-slate-500 text-xs sm:text-sm mt-1.5 max-w-2xl leading-relaxed">
-                                Quản lý danh sách các đề thi thử, thiết lập thời gian thi, điểm đạt và hệ thống câu hỏi trắc nghiệm &amp; truy vấn SQL.
-                            </p>
-                        </div>
-
-                        <div className="flex items-center gap-3 shrink-0">
-                            <button
-                                onClick={() => handleOpenTestModal()}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                                </svg>
-                                <span>Tạo Đề Thi Mới</span>
-                            </button>
-                        </div>
+                    {/* Top Action Bar */}
+                    <div className="flex items-center justify-end">
+                        <button
+                            onClick={() => handleOpenTestModal()}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span>Tạo Đề Thi Mới</span>
+                        </button>
                     </div>
 
                     {/* KPI Metric Summary Cards */}
