@@ -2,9 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import authService from '@/services/authService';
+import userService from '@/services/userService';
 
 export default function AdminSidebar() {
     const pathname = usePathname();
+    const router = useRouter();
+
+    const handleLogout = async () => {
+        try {
+            await authService.logout();
+        } finally {
+            userService.clearCache();
+            router.replace('/login');
+        }
+    };
 
     const navItems = [
         {
@@ -116,7 +129,7 @@ export default function AdminSidebar() {
 
                     <button
                         type="button"
-                        onClick={() => console.log('Admin logout')}
+                        onClick={handleLogout}
                         className="flex items-center gap-3.5 text-rose-600 hover:bg-rose-50 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors w-full text-left cursor-pointer"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

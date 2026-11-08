@@ -33,9 +33,10 @@ export interface AuthResponse extends Partial<AuthTokens> {
 }
 
 export interface VerifyEmailData {
-    email?: string;
+    email: string;
     code?: string;
     token?: string;
+    otp?: string;
 }
 
 export interface ForgotPasswordData {
@@ -141,7 +142,10 @@ export const authService = {
      * POST /api/auth/verify-email
      */
     verifyEmail: async (data: VerifyEmailData): Promise<any> => {
-        const response = await apiClient.post('/api/auth/verify-email', data);
+        const response = await apiClient.post('/api/auth/verify-email', {
+            email: data.email.trim(),
+            otp: data.otp || data.code || data.token || '',
+        });
         return response.data;
     },
 
@@ -159,7 +163,10 @@ export const authService = {
      * POST /api/auth/reset-password
      */
     resetPassword: async (data: ResetPasswordData): Promise<any> => {
-        const response = await apiClient.post('/api/auth/reset-password', data);
+        const response = await apiClient.post('/api/auth/reset-password', {
+            token: data.token || data.code || '',
+            newPassword: data.newPassword || data.password || '',
+        });
         return response.data;
     },
 };
