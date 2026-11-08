@@ -5,7 +5,6 @@ import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import practiceService, { PracticeDatabase } from '@/services/practiceService';
-import { DATABASES_LIST } from './data';
 
 const getDifficultyColor = (diff: string | undefined): string => {
     const d = (diff || '').toLowerCase();
@@ -44,16 +43,14 @@ export default function PracticePage() {
         setError(null);
         try {
             const data = await practiceService.getDatabases();
-            if (Array.isArray(data) && data.length > 0) {
+            if (Array.isArray(data)) {
                 setDatabases(data);
             } else {
-                console.warn('[Practice] API databases rỗng, chuyển sang mock data dự phòng.');
-                setDatabases(DATABASES_LIST as any);
+                setDatabases([]);
             }
         } catch (err: any) {
             console.error('[Practice] Lỗi khi gọi getDatabases:', err);
-            // Fallback sang DATABASES_LIST để trải nghiệm dev không bị gián đoạn
-            setDatabases(DATABASES_LIST as any);
+            setDatabases([]);
             setError(err?.response?.data?.message || err?.message || 'Không thể đồng bộ danh sách CSDL từ máy chủ.');
         } finally {
             setIsLoading(false);

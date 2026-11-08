@@ -54,22 +54,22 @@ function LessonContent() {
         setCurriculumError(null);
         try {
             const data = await learningService.getCurriculum();
-            if (Array.isArray(data) && data.length > 0) {
+            if (Array.isArray(data)) {
                 setCurriculum(data);
-                // Mặc định mở category đầu tiên nếu chưa mở
-                const firstCatName = data[0].category || data[0].name || data[0].title || '';
-                setOpenCategory((prev) => prev || firstCatName);
+                if (data.length > 0) {
+                    const firstCatName = data[0].category || data[0].name || data[0].title || '';
+                    setOpenCategory((prev) => prev || firstCatName);
+                } else {
+                    setOpenCategory('');
+                }
             } else {
-                // Fallback sang local data nếu API trả rỗng trong quá trình dev
-                console.warn('[Learning] API Curriculum rỗng, sử dụng mock data fallback.');
-                setCurriculum(SQL_COURSES as any);
-                setOpenCategory(SQL_COURSES[0]?.category || '');
+                setCurriculum([]);
+                setOpenCategory('');
             }
         } catch (err: any) {
             console.error('[Learning] Lỗi gọi API getCurriculum:', err);
-            // Fallback sang SQL_COURSES mock data để không làm gián đoạn trải nghiệm người dùng
-            setCurriculum(SQL_COURSES as any);
-            setOpenCategory(SQL_COURSES[0]?.category || '');
+            setCurriculum([]);
+            setOpenCategory('');
             setCurriculumError(err?.response?.data?.message || err?.message || 'Không thể đồng bộ lộ trình từ máy chủ.');
         } finally {
             setIsLoadingCurriculum(false);

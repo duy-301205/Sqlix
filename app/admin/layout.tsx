@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import userService from '@/services/userService';
+import { checkCanAccessAdmin } from '@/services/authService';
 import AdminSidebar from './components/AdminSidebar';
 import AdminHeader from './components/AdminHeader';
 
@@ -24,7 +25,7 @@ export default function AdminLayout({
 
         userService.getCurrentUser(true).then((user) => {
             if (!active) return;
-            if (user.role !== 'ADMIN') {
+            if (!checkCanAccessAdmin(user.role)) {
                 router.replace('/dashboard');
                 return;
             }

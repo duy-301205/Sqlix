@@ -10,7 +10,6 @@ import mockTestService, {
     WorkspaceQuestion,
 } from '@/services/mockTestService';
 import practiceService, { RunQueryResponse } from '@/services/practiceService';
-import { MOCK_TESTS } from '@/app/mock-test/mockTestData';
 import ErdTab from '@/app/practice/[id]/components/ErdTab';
 import OverviewTab from '@/app/practice/[id]/components/OverviewTab';
 import { DATABASES_DETAIL } from '@/app/practice/[id]/data';
@@ -77,50 +76,8 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
             }
         } catch (err: any) {
             console.error('[TestWorkspace] Lỗi khi tải dữ liệu phòng thi:', err);
-
-            // Fallback sang dữ liệu MOCK_TESTS mẫu để preview mượt mà
-            console.warn('[TestWorkspace] Kích hoạt dữ liệu câu hỏi dự phòng');
-            const fallbackTest = MOCK_TESTS[0];
-            const fallbackQuestions: WorkspaceQuestion[] = (fallbackTest.questions || []).map((q, idx) => {
-                const isSql = (q.type as any) === 'sql_query' || idx % 2 === 0;
-                return {
-                    id: q.id || `q-${idx + 1}`,
-                    questionType: isSql ? 'SQL' : 'MULTIPLE_CHOICE',
-                    title: (q as any).title || q.question || `Câu hỏi ${idx + 1}`,
-                    content: q.description || q.question || '',
-                    points: q.points || 10,
-                    sortOrder: idx + 1,
-                    sampleQuery: isSql ? q.sampleQuery || 'SELECT * FROM products;' : undefined,
-                    mcOptions: !isSql
-                        ? [
-                              { id: 'A', text: 'SELECT * FROM products WHERE price > 100;' },
-                              { id: 'B', text: 'SELECT name, price FROM products ORDER BY price DESC;' },
-                              { id: 'C', text: 'SELECT category_id, COUNT(*) FROM products GROUP BY category_id;' },
-                              { id: 'D', text: 'SELECT DISTINCT category_id FROM products;' },
-                          ]
-                        : undefined,
-                    databaseId: 'ecommerce',
-                    expectedColumns: isSql ? ['id', 'name', 'price', 'category_id'] : undefined,
-                };
-            });
-
-            const fallbackWorkspace: TestWorkspaceResponse = {
-                id: sessionId,
-                sessionId,
-                testTitle: fallbackTest.title,
-                startTime: new Date().toISOString(),
-                durationMinutes: fallbackTest.durationMinutes || 45,
-                questions: fallbackQuestions,
-            };
-
-            setWorkspace(fallbackWorkspace);
-            setQuestions(fallbackQuestions);
-
-            const initialAnswers: Record<string, string> = {};
-            fallbackQuestions.forEach((q) => {
-                if (q.sampleQuery) initialAnswers[q.id] = q.sampleQuery;
-            });
-            setUserAnswers(initialAnswers);
+            setWorkspace(null);
+            setQuestions([]);
         } finally {
             setIsLoadingWorkspace(false);
         }

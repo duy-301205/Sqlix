@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import adminLearningService from '@/services/adminLearningService';
-import { mockLearningCategories } from '../mockData';
 import { LearningCategory, LessonItem, SectionItem } from '../types';
 
 type ModalType = 'CATEGORY' | 'LESSON' | 'SECTION' | null;
@@ -134,7 +133,7 @@ export default function AdminLearningPage() {
         setIsLoading(true);
         try {
             const raw = await adminLearningService.getAdminCurriculum();
-            if (Array.isArray(raw) && raw.length > 0) {
+            if (Array.isArray(raw)) {
                 const normalized = normalizeCurriculumData(raw);
                 setCategories(normalized);
                 setSelectedCategoryId((prev) => {
@@ -142,13 +141,13 @@ export default function AdminLearningPage() {
                     return normalized[0]?.id || null;
                 });
             } else {
-                throw new Error('Dữ liệu lộ trình rỗng');
+                setCategories([]);
+                setSelectedCategoryId(null);
             }
         } catch (err: any) {
-            console.warn('[AdminLearning] Không thể tải cây danh mục từ API, kích hoạt mock data fallback:', err.message);
-            const fallback = normalizeCurriculumData(mockLearningCategories);
-            setCategories(fallback);
-            setSelectedCategoryId((prev) => prev || fallback[0]?.id || null);
+            console.error('[AdminLearning] Không thể tải cây danh mục từ API:', err);
+            setCategories([]);
+            setSelectedCategoryId(null);
         } finally {
             setIsLoading(false);
         }

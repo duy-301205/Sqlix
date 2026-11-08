@@ -5,7 +5,6 @@ import adminPracticeService, {
     DatabaseRequest,
     ExerciseRequest,
 } from '@/services/adminPracticeService';
-import { mockDatabases, mockExercises } from '../mockData';
 import { PracticeDatabase, PracticeExercise } from '../types';
 
 type ModalMode = 'DATABASE' | 'EXERCISE' | null;
@@ -177,16 +176,15 @@ export default function AdminPracticePage() {
         setIsLoadingDatabases(true);
         try {
             const rawList = await adminPracticeService.getAdminDatabases();
-            if (Array.isArray(rawList) && rawList.length > 0) {
+            if (Array.isArray(rawList)) {
                 const normalized = rawList.map((db, idx) => normalizeDatabase(db, idx));
                 setDatabases(normalized);
             } else {
-                // Fallback to mock data if empty
-                setDatabases(mockDatabases.map((db, idx) => normalizeDatabase(db, idx)));
+                setDatabases([]);
             }
         } catch (err) {
-            console.warn('[AdminPractice] Lỗi tải databases từ API, sử dụng mock:', err);
-            setDatabases(mockDatabases.map((db, idx) => normalizeDatabase(db, idx)));
+            console.error('[AdminPractice] Lỗi tải databases từ API:', err);
+            setDatabases([]);
         } finally {
             setIsLoadingDatabases(false);
         }
@@ -197,31 +195,18 @@ export default function AdminPracticePage() {
         setIsLoadingExercises(true);
         try {
             const rawExercises = await adminPracticeService.getAdminExercises(dbId);
-            if (Array.isArray(rawExercises) && rawExercises.length > 0) {
+            if (Array.isArray(rawExercises)) {
                 const normalized = rawExercises.map((ex, idx) => normalizeExercise(ex, idx, dbId));
                 setExercises((prev) => {
                     const others = prev.filter((e) => e.databaseId !== dbId);
                     return [...others, ...normalized];
                 });
             } else {
-                // Fallback to mock exercises for this database if empty
-                const mocks = mockExercises
-                    .filter((e) => e.databaseId === dbId)
-                    .map((ex, idx) => normalizeExercise(ex, idx, dbId));
-                setExercises((prev) => {
-                    const others = prev.filter((e) => e.databaseId !== dbId);
-                    return [...others, ...mocks];
-                });
+                setExercises((prev) => prev.filter((e) => e.databaseId !== dbId));
             }
         } catch (err) {
-            console.warn(`[AdminPractice] Lỗi tải exercises cho DB ${dbId}:`, err);
-            const mocks = mockExercises
-                .filter((e) => e.databaseId === dbId)
-                .map((ex, idx) => normalizeExercise(ex, idx, dbId));
-            setExercises((prev) => {
-                const others = prev.filter((e) => e.databaseId !== dbId);
-                return [...others, ...mocks];
-            });
+            console.error(`[AdminPractice] Lỗi tải exercises cho DB ${dbId}:`, err);
+            setExercises((prev) => prev.filter((e) => e.databaseId !== dbId));
         } finally {
             setIsLoadingExercises(false);
         }

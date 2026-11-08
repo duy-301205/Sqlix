@@ -33,18 +33,9 @@ export const adminMockTestService = {
 
     /**
      * Lấy danh sách toàn bộ đề thi thử cho quản trị viên
-     * Thử GET /api/admin/mock-tests trước, nếu chưa có thì fallback sang /api/mock-tests
+     * Gọi GET /api/mock-tests
      */
     getAdminMockTests: async (): Promise<AdminMockTest[]> => {
-        try {
-            const response = await apiClient.get<any>('/api/admin/mock-tests');
-            const data = unwrapResponse<any>(response.data);
-            if (Array.isArray(data)) return data;
-            if (data && Array.isArray(data.items)) return data.items;
-        } catch {
-            // Fallback sang endpoint read chung của user
-        }
-
         try {
             const response = await apiClient.get<any>('/api/mock-tests', {
                 params: { page: 0, size: 100 },
@@ -52,8 +43,8 @@ export const adminMockTestService = {
             const data = unwrapResponse<any>(response.data);
             if (Array.isArray(data)) return data;
             if (data && Array.isArray(data.items)) return data.items;
-        } catch {
-            // ignore
+        } catch (err) {
+            console.error('[AdminMockTest] Lỗi lấy danh sách đề thi:', err);
         }
 
         return [];
@@ -61,20 +52,13 @@ export const adminMockTestService = {
 
     /**
      * Lấy thông tin chi tiết một đề thi thử
-     * Thử GET /api/admin/mock-tests/{id} trước, fallback sang /api/mock-tests/{id}
+     * Gọi GET /api/mock-tests/{id}
      */
     getAdminMockTestDetail: async (id: string): Promise<any> => {
-        try {
-            const response = await apiClient.get<any>(
-                `/api/admin/mock-tests/${encodeURIComponent(id)}`
-            );
-            return unwrapResponse<any>(response.data);
-        } catch {
-            const response = await apiClient.get<any>(
-                `/api/mock-tests/${encodeURIComponent(id)}`
-            );
-            return unwrapResponse<any>(response.data);
-        }
+        const response = await apiClient.get<any>(
+            `/api/mock-tests/${encodeURIComponent(id)}`
+        );
+        return unwrapResponse<any>(response.data);
     },
 
     /**

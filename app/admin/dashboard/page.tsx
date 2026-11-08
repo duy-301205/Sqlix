@@ -5,7 +5,6 @@ import Link from 'next/link';
 import adminDashboardService, {
     AdminSystemStats,
 } from '@/services/adminDashboardService';
-import { mockDashboardStats } from '../mockData';
 
 export default function AdminDashboardPage() {
     const [stats, setStats] = useState<AdminSystemStats | null>(null);
@@ -31,11 +30,18 @@ export default function AdminDashboardPage() {
                 throw new Error('Dữ liệu thống kê không hợp lệ');
             }
         } catch (err: any) {
-            console.warn('[AdminDashboard] Không thể tải dữ liệu từ API máy chủ, kích hoạt fallback:', err.message);
+            console.error('[AdminDashboard] Không thể tải dữ liệu từ API máy chủ:', err);
             setError(err?.response?.data?.message || err?.message || 'Không thể đồng bộ số liệu thống kê từ máy chủ.');
-
-            // Fallback sang mockDashboardStats để đảm bảo giao diện luôn hiển thị
-            setStats(mockDashboardStats);
+            setStats({
+                totalUsers: 0,
+                totalDatabases: 0,
+                totalExercises: 0,
+                totalMockTests: 0,
+                totalTestSessions: 0,
+                activeUsersToday: 0,
+                passRatePercent: 0,
+                recentTestSessions: [],
+            });
         } finally {
             setIsLoading(false);
             setIsRefreshing(false);

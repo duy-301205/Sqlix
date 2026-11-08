@@ -5,7 +5,6 @@ import adminUserService, {
     AdminUser,
     AdminUserPaginationInfo,
 } from '@/services/adminUserService';
-import { mockUsers } from '../mockData';
 
 export default function AdminUsersPage() {
     // ================= State Quản lý Người dùng =================
@@ -92,46 +91,14 @@ export default function AdminUsersPage() {
                 throw new Error('Cấu trúc dữ liệu API trả về không hợp lệ');
             }
         } catch (err: any) {
-            console.warn('[AdminUsers] Không thể tải dữ liệu từ API máy chủ, kích hoạt mock fallback:', err.message);
+            console.error('[AdminUsers] Không thể tải dữ liệu từ API máy chủ:', err);
             setError(err?.response?.data?.message || err?.message || 'Không thể đồng bộ danh sách người dùng từ máy chủ.');
-
-            // Fallback sang mockUsers nội bộ
-            let list: AdminUser[] = mockUsers.map((m) => ({
-                ...m,
-                active: m.status === 'ACTIVE',
-                role: m.role as any,
-            }));
-
-            if (debouncedSearch.trim()) {
-                const kw = debouncedSearch.toLowerCase().trim();
-                list = list.filter(
-                    (u) =>
-                        u.fullName.toLowerCase().includes(kw) ||
-                        u.email.toLowerCase().includes(kw) ||
-                        u.username.toLowerCase().includes(kw)
-                );
-            }
-
-            if (roleFilter !== 'ALL') {
-                list = list.filter((u) => u.role === roleFilter || (roleFilter === 'USER' && (u.role as string) === 'STUDENT'));
-            }
-
-            if (statusFilter === 'ACTIVE') {
-                list = list.filter((u) => u.active);
-            } else if (statusFilter === 'BANNED') {
-                list = list.filter((u) => !u.active);
-            }
-
-            const total = list.length;
-            const start = currentPage * pageSize;
-            const paginated = list.slice(start, start + pageSize);
-
-            setUsers(paginated);
+            setUsers([]);
             setPagination({
-                total,
+                total: 0,
                 page: currentPage,
                 size: pageSize,
-                totalPages: Math.max(1, Math.ceil(total / pageSize)),
+                totalPages: 1,
             });
         } finally {
             setIsLoading(false);

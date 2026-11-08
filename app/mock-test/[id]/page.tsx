@@ -16,7 +16,24 @@ export default function MockTestRoomPage({ params }: MockTestRoomPageProps) {
     const testId = resolvedParams.id || 'mock-1';
 
     const testItem: MockTestItem = useMemo(() => {
-        return MOCK_TESTS.find((t) => t.id === testId) || MOCK_TESTS[0];
+        return (
+            MOCK_TESTS.find((t) => t.id === testId) ||
+            MOCK_TESTS[0] || {
+                id: testId,
+                title: 'Đề thi thử SQL',
+                category: 'SQL',
+                difficulty: 'Dễ',
+                difficultyColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                description: 'Đề thi đang được cập nhật từ quản trị viên.',
+                questionsCount: 0,
+                durationMinutes: 45,
+                participantsCount: 0,
+                icon: 'school',
+                iconBg: 'bg-blue-50 border-blue-100',
+                iconColor: 'text-blue-600',
+                questions: [],
+            }
+        );
     }, [testId]);
 
     // Chỉ lấy các câu hỏi dạng sql_query (truy vấn)

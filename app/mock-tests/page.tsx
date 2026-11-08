@@ -5,7 +5,6 @@ import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import mockTestService, { MockTestSummary } from '@/services/mockTestService';
-import { MOCK_TESTS } from '@/app/mock-test/mockTestData';
 
 type SortOption = 'newest' | 'popular' | 'questions';
 
@@ -123,21 +122,20 @@ export default function MockTestsListPage() {
                 size: 8,
             });
 
-            if (data && Array.isArray(data.items) && data.items.length > 0) {
+            if (data && Array.isArray(data.items)) {
                 setMockTests(data.items);
                 setTotalPages(data.totalPages || 1);
                 setTotalCount(data.total || data.items.length);
             } else {
-                console.warn('[MockTests] API rỗng, kích hoạt fallback data.');
-                setMockTests(MOCK_TESTS as any);
+                setMockTests([]);
                 setTotalPages(1);
-                setTotalCount(MOCK_TESTS.length);
+                setTotalCount(0);
             }
         } catch (err: any) {
             console.error('[MockTests] Lỗi khi tải danh sách đề thi:', err);
-            setMockTests(MOCK_TESTS as any);
+            setMockTests([]);
             setTotalPages(1);
-            setTotalCount(MOCK_TESTS.length);
+            setTotalCount(0);
             setError(err?.response?.data?.message || err?.message || 'Không thể đồng bộ đề thi từ máy chủ.');
         } finally {
             setIsLoading(false);

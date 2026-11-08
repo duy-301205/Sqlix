@@ -8,7 +8,6 @@ import adminHistoryService, {
     AdminHistoryPagination,
 } from '@/services/adminHistoryService';
 import adminMockTestService from '@/services/adminMockTestService';
-import { mockHistorySessions, mockMockTests } from '../mockData';
 
 interface ToastState {
     message: string;
@@ -94,13 +93,13 @@ export default function AdminHistoryPage() {
     const fetchAvailableTests = useCallback(async () => {
         try {
             const rawTests = await adminMockTestService.getAdminMockTests();
-            if (Array.isArray(rawTests) && rawTests.length > 0) {
+            if (Array.isArray(rawTests)) {
                 setMockTestsList(rawTests.map((t) => ({ id: t.id, title: t.title })));
             } else {
-                setMockTestsList(mockMockTests.map((t) => ({ id: t.id, title: t.title })));
+                setMockTestsList([]);
             }
         } catch {
-            setMockTestsList(mockMockTests.map((t) => ({ id: t.id, title: t.title })));
+            setMockTestsList([]);
         }
     }, []);
 
@@ -133,64 +132,27 @@ export default function AdminHistoryPage() {
         try {
             const res = await adminHistoryService.getAllHistories(params);
 
-            if (res && Array.isArray(res.items) && res.items.length > 0) {
+            if (res && Array.isArray(res.items)) {
                 const normalized = res.items.map((item, idx) => normalizeHistoryItem(item, idx));
                 setHistories(normalized);
                 setPagination(res.pagination);
             } else {
-                // Fallback filtering on mock data if API returns empty
-                let filteredMock = mockHistorySessions.map((item, idx) => normalizeHistoryItem(item, idx));
-
-                if (keyword.trim()) {
-                    const kw = keyword.trim().toLowerCase();
-                    filteredMock = filteredMock.filter(
-                        (s) =>
-                            s.userName.toLowerCase().includes(kw) ||
-                            s.userEmail?.toLowerCase().includes(kw) ||
-                            s.sessionId.toLowerCase().includes(kw) ||
-                            s.testTitle.toLowerCase().includes(kw)
-                    );
-                }
-
-                if (selectedTestId !== 'ALL') {
-                    filteredMock = filteredMock.filter((s) => s.mockTestId === selectedTestId);
-                }
-
-                if (isPassedFilter === 'PASSED') {
-                    filteredMock = filteredMock.filter((s) => s.isPassed);
-                } else if (isPassedFilter === 'FAILED') {
-                    filteredMock = filteredMock.filter((s) => !s.isPassed);
-                }
-
-                if (minScore !== '') {
-                    filteredMock = filteredMock.filter((s) => s.score >= Number(minScore));
-                }
-                if (maxScore !== '') {
-                    filteredMock = filteredMock.filter((s) => s.score <= Number(maxScore));
-                }
-
-                const total = filteredMock.length;
-                const totalPages = Math.max(1, Math.ceil(total / size));
-                const start = page * size;
-                const pageItems = filteredMock.slice(start, start + size);
-
-                setHistories(pageItems);
+                setHistories([]);
                 setPagination({
-                    total,
+                    total: 0,
                     page,
                     size,
-                    totalPages,
+                    totalPages: 1,
                 });
             }
         } catch (err) {
-            console.warn('[AdminHistory] Lỗi fetch lịch sử từ API, dùng mock fallback:', err);
-            const normalizedMock = mockHistorySessions.map((item, idx) => normalizeHistoryItem(item, idx));
-            setHistories(normalizedMock);
+            console.error('[AdminHistory] Lỗi fetch lịch sử từ API:', err);
+            setHistories([]);
             setPagination({
-                total: normalizedMock.length,
+                total: 0,
                 page: 0,
                 size: 10,
-                totalPages: Math.max(1, Math.ceil(normalizedMock.length / 10)),
+                totalPages: 1,
             });
         } finally {
             setIsLoading(false);

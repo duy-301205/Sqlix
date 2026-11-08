@@ -13,11 +13,6 @@ import {
     QuestionOption,
     PracticeDatabase,
 } from '../types';
-import {
-    mockMockTests,
-    mockQuestions,
-    mockDatabases,
-} from '../mockData';
 
 interface ToastState {
     message: string;
@@ -225,13 +220,13 @@ export default function AdminMockTestsPage() {
     const fetchDatabases = useCallback(async () => {
         try {
             const raw = await adminPracticeService.getAdminDatabases();
-            if (Array.isArray(raw) && raw.length > 0) {
+            if (Array.isArray(raw)) {
                 setDatabases(raw as any);
             } else {
-                setDatabases(mockDatabases);
+                setDatabases([]);
             }
         } catch {
-            setDatabases(mockDatabases);
+            setDatabases([]);
         }
     }, []);
 
@@ -240,15 +235,15 @@ export default function AdminMockTestsPage() {
         setIsLoadingTests(true);
         try {
             const rawTests = await adminMockTestService.getAdminMockTests();
-            if (Array.isArray(rawTests) && rawTests.length > 0) {
+            if (Array.isArray(rawTests)) {
                 const normalized = rawTests.map((t, idx) => normalizeMockTest(t, idx));
                 setMockTests(normalized);
             } else {
-                setMockTests(mockMockTests.map((t, idx) => normalizeMockTest(t, idx)));
+                setMockTests([]);
             }
         } catch (err) {
-            console.warn('[AdminMockTest] Lỗi fetch mock tests từ API, dùng mock fallback:', err);
-            setMockTests(mockMockTests.map((t, idx) => normalizeMockTest(t, idx)));
+            console.error('[AdminMockTest] Lỗi fetch mock tests từ API:', err);
+            setMockTests([]);
         } finally {
             setIsLoadingTests(false);
         }
@@ -259,30 +254,18 @@ export default function AdminMockTestsPage() {
         setIsLoadingQuestions(true);
         try {
             const rawQuestions = await adminMockTestService.getAdminMockTestQuestions(testId);
-            if (Array.isArray(rawQuestions) && rawQuestions.length > 0) {
+            if (Array.isArray(rawQuestions)) {
                 const normalized = rawQuestions.map((q, idx) => normalizeQuestion(q, idx, testId));
                 setQuestions((prev) => {
                     const others = prev.filter((q) => q.mockTestId !== testId);
                     return [...others, ...normalized];
                 });
             } else {
-                const mocks = mockQuestions
-                    .filter((q) => q.mockTestId === testId)
-                    .map((q, idx) => normalizeQuestion(q, idx, testId));
-                setQuestions((prev) => {
-                    const others = prev.filter((q) => q.mockTestId !== testId);
-                    return [...others, ...mocks];
-                });
+                setQuestions((prev) => prev.filter((q) => q.mockTestId !== testId));
             }
         } catch (err) {
-            console.warn(`[AdminMockTest] Lỗi tải câu hỏi cho test ${testId}:`, err);
-            const mocks = mockQuestions
-                .filter((q) => q.mockTestId === testId)
-                .map((q, idx) => normalizeQuestion(q, idx, testId));
-            setQuestions((prev) => {
-                const others = prev.filter((q) => q.mockTestId !== testId);
-                return [...others, ...mocks];
-            });
+            console.error(`[AdminMockTest] Lỗi tải câu hỏi cho test ${testId}:`, err);
+            setQuestions((prev) => prev.filter((q) => q.mockTestId !== testId));
         } finally {
             setIsLoadingQuestions(false);
         }

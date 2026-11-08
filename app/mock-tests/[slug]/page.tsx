@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import mockTestService, { MockTestDetail } from '@/services/mockTestService';
-import { MOCK_TESTS } from '@/app/mock-test/mockTestData';
 
 interface PageProps {
     params: Promise<{ slug: string }>;
@@ -47,24 +46,8 @@ export default function MockTestDetailPage({ params }: PageProps) {
             }
         } catch (err: any) {
             console.error(`[MockTest] Lỗi khi tải chi tiết đề thi slug="${slug}":`, err);
-
-            // Fallback sang dữ liệu MOCK_TESTS nội bộ nếu API chưa có slug này
-            const fallback =
-                MOCK_TESTS.find((t) => t.id === slug || (t as any).slug === slug) || MOCK_TESTS[0];
-
-            setTestDetail({
-                ...fallback,
-                slug: fallback.id,
-                overview: fallback.description,
-                rules: [
-                    'Thời gian làm bài sẽ được đếm ngược liên tục ngay khi bạn nhấn "Bắt đầu làm bài".',
-                    'Mỗi câu hỏi trắc nghiệm hoặc SQL yêu cầu thực hiện đúng định dạng và logic truy vấn dữ liệu.',
-                    'Hệ thống tự động lưu câu trả lời sau mỗi lần chọn đáp án hoặc thực thi câu lệnh SQL.',
-                    'Không tải lại trang hoặc tắt tab trình duyệt trong quá trình thi để bảo toàn điểm số.',
-                ],
-                passingScore: 80,
-                totalScore: 100,
-            } as any);
+            setSessionError(err?.response?.data?.message || err?.message || 'Không tìm thấy thông tin đề thi này.');
+            setTestDetail(null);
         } finally {
             setIsLoading(false);
         }

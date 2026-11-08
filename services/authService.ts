@@ -171,4 +171,68 @@ export const authService = {
     },
 };
 
+/**
+ * Kiểm tra xem role có phải là ADMIN hay không
+ */
+export const checkIsAdmin = (roleData?: any): boolean => {
+    if (!roleData) return false;
+    if (Array.isArray(roleData)) {
+        return roleData.some((r) => checkIsAdmin(r));
+    }
+    const r = String(roleData).toUpperCase().trim();
+    return r === 'ADMIN' || r === 'ROLE_ADMIN' || r.includes('ADMIN');
+};
+
+/**
+ * Kiểm tra xem user có quyền vào trang quản trị hay không (ADMIN hoặc GIÁO VIÊN / INSTRUCTOR)
+ */
+export const checkCanAccessAdmin = (roleData?: any): boolean => {
+    if (!roleData) return false;
+    if (Array.isArray(roleData)) {
+        return roleData.some((r) => checkCanAccessAdmin(r));
+    }
+    const r = String(roleData).toUpperCase().trim();
+    return (
+        r === 'ADMIN' ||
+        r === 'ROLE_ADMIN' ||
+        r === 'INSTRUCTOR' ||
+        r === 'ROLE_INSTRUCTOR' ||
+        r === 'TEACHER' ||
+        r === 'ROLE_TEACHER' ||
+        r.includes('ADMIN') ||
+        r.includes('INSTRUCTOR') ||
+        r.includes('TEACHER')
+    );
+};
+
+/**
+ * Trích xuất role từ accessToken JWT nếu có
+ */
+export const extractRoleFromToken = (token?: string | null): string | null => {
+    if (!token) return null;
+    try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+            const base64Url = parts[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(
+                atob(base64)
+                    .split('')
+                    .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                    .join('')
+            );
+            const parsed = JSON.parse(jsonPayload);
+            return parsed?.role || parsed?.roles || parsed?.scope || parsed?.authorities || null;
+        }
+    } catch {
+        try {
+            const parsed = JSON.parse(atob(token.split('.')[1]));
+            return parsed?.role || parsed?.roles || parsed?.scope || parsed?.authorities || null;
+        } catch {
+            return null;
+        }
+    }
+    return null;
+};
+
 export default authService;

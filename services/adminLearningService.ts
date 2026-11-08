@@ -31,17 +31,10 @@ const unwrapResponse = <T>(data: any): T => {
 export const adminLearningService = {
     /**
      * Lấy cây danh mục lộ trình và danh sách bài học dành cho Admin
-     * Thử GET /api/admin/learning/curriculum trước, fallback sang /api/learning/curriculum
+     * Gọi GET /api/learning/curriculum
      * @returns Cây danh mục học tập
      */
     getAdminCurriculum: async (): Promise<any[]> => {
-        try {
-            const response = await apiClient.get<any>('/api/admin/learning/curriculum');
-            const data = unwrapResponse<any>(response.data);
-            if (Array.isArray(data)) return data;
-        } catch {
-            // Fallback sang endpoint read chung của user nếu admin endpoint chưa mount
-        }
         const response = await apiClient.get<any>('/api/learning/curriculum');
         const data = unwrapResponse<any>(response.data);
         return Array.isArray(data) ? data : [];

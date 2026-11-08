@@ -10,10 +10,6 @@ import historyService, {
     HistoryDetail,
 } from '@/services/historyService';
 import {
-    MOCK_HISTORY_DATA,
-    calculateHistoryStats,
-} from './historyData';
-import {
     Clock,
     Award,
     CheckCircle2,
@@ -148,17 +144,20 @@ export default function MockTestHistoryPage() {
             if (data && (data.totalTestsTaken !== undefined || data.averageScore !== undefined)) {
                 setSummary(data);
             } else {
-                throw new Error('Dữ liệu thống kê không hợp lệ');
+                setSummary({
+                    totalTestsTaken: 0,
+                    averageScore: 0,
+                    highestScore: 0,
+                    passRatePercentage: 0,
+                });
             }
         } catch (err: any) {
-            console.warn('[History] Sử dụng dữ liệu thống kê dự phòng:', err.message);
-            // Fallback sang thống kê tính từ mock data
-            const fallbackStats = calculateHistoryStats(MOCK_HISTORY_DATA);
+            console.error('[History] Lỗi khi tải dữ liệu thống kê:', err);
             setSummary({
-                totalTestsTaken: fallbackStats.totalAttempts,
-                averageScore: fallbackStats.averageScore,
-                highestScore: fallbackStats.bestScore,
-                passRatePercentage: fallbackStats.passRate,
+                totalTestsTaken: 0,
+                averageScore: 0,
+                highestScore: 0,
+                passRatePercentage: 0,
             });
         } finally {
             setIsLoadingSummary(false);
@@ -204,59 +203,15 @@ export default function MockTestHistoryPage() {
                 setTotalItems(res.total ?? res.items.length);
                 setTotalPages(res.totalPages ?? Math.max(1, Math.ceil((res.total ?? res.items.length) / ITEMS_PER_PAGE)));
             } else {
-                throw new Error('Cấu trúc mảng lịch sử thi không đúng');
+                setHistoryItems([]);
+                setTotalItems(0);
+                setTotalPages(1);
             }
         } catch (err: any) {
-            console.warn('[History] Lỗi nạp lịch sử thi từ máy chủ, sử dụng dữ liệu cục bộ dự phòng:', err.message);
-
-            // Fallback: Lọc và phân trang trên MOCK_HISTORY_DATA
-            let list = [...MOCK_HISTORY_DATA];
-            if (keyword.trim()) {
-                const kw = keyword.toLowerCase().trim();
-                list = list.filter(
-                    (i) => i.testTitle.toLowerCase().includes(kw) || (i.category && i.category.toLowerCase().includes(kw))
-                );
-            }
-            if (statusFilter !== 'all') {
-                if (statusFilter === 'passed') list = list.filter((i) => i.score >= 60);
-                else if (statusFilter === 'failed') list = list.filter((i) => i.score < 60 && i.status !== 'timeout');
-                else if (statusFilter === 'timeout') list = list.filter((i) => i.status === 'timeout');
-            }
-            if (difficultyFilter !== 'all') {
-                list = list.filter((i) => i.difficulty === difficultyFilter);
-            }
-
-            // Sắp xếp
-            if (sortBy === 'newest') list.sort((a, b) => b.submittedTimestamp - a.submittedTimestamp);
-            else if (sortBy === 'oldest') list.sort((a, b) => a.submittedTimestamp - b.submittedTimestamp);
-            else if (sortBy === 'highest_score') list.sort((a, b) => b.score - a.score);
-            else if (sortBy === 'lowest_score') list.sort((a, b) => a.score - b.score);
-
-            const total = list.length;
-            const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
-            const paged = list.slice(startIdx, startIdx + ITEMS_PER_PAGE).map((item) => ({
-                sessionId: item.id,
-                id: item.id,
-                testId: item.testId,
-                testTitle: item.testTitle,
-                difficulty: item.difficulty,
-                submittedAt: item.submittedAt,
-                durationSeconds: item.timeSpentSeconds,
-                timeSpentSeconds: item.timeSpentSeconds,
-                durationMinutes: item.durationMinutes,
-                correctCount: item.correctAnswers,
-                correctAnswers: item.correctAnswers,
-                totalQuestions: item.totalQuestions,
-                score: item.score,
-                isPassed: item.score >= 60,
-                status: item.status,
-                category: item.category,
-                questionsReview: item.questionsReview,
-            }));
-
-            setHistoryItems(paged);
-            setTotalItems(total);
-            setTotalPages(Math.max(1, Math.ceil(total / ITEMS_PER_PAGE)));
+            console.error('[History] Lỗi nạp lịch sử thi từ máy chủ:', err);
+            setHistoryItems([]);
+            setTotalItems(0);
+            setTotalPages(1);
         } finally {
             setIsLoadingList(false);
         }
@@ -278,8 +233,6 @@ export default function MockTestHistoryPage() {
             setSelectedReviewItem(detail);
         } catch (err: any) {
             console.warn('[History] Không thể tải chi tiết phiên thi từ API, hiển thị thông tin sẵn có:', err.message);
-            // Fallback sử dụng questionsReview từ mock data
-            const fallbackItem = MOCK_HISTORY_DATA.find((m) => m.id === item.sessionId) || (item as any);
             setSelectedReviewItem({
                 sessionId: item.sessionId,
                 testId: item.testId,
@@ -296,8 +249,8 @@ export default function MockTestHistoryPage() {
                 correctAnswers: item.correctAnswers || item.correctCount || 0,
                 totalQuestions: item.totalQuestions || 5,
                 status: item.status,
-                questions: fallbackItem.questionsReview || [],
-                questionsReview: fallbackItem.questionsReview || [],
+                questions: (item as any).questionsReview || [],
+                questionsReview: (item as any).questionsReview || [],
             });
         } finally {
             setIsLoadingDetail(false);
