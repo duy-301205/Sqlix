@@ -104,6 +104,8 @@ export interface PracticeDatabase {
     createdAt: string;
     updatedAt: string;
     exerciseCount: number;
+    difficulty?: string;
+    iconUrl?: string;
 }
 
 export interface PracticeExercise {
@@ -143,8 +145,15 @@ export interface MockTestQuestion {
     databaseId?: string;
     solutionQuery?: string;
     initialQuery?: string;
+    requirements?: any;
+    expectedColumns?: any;
+    maxRetries?: number;
     // For MULTIPLE_CHOICE:
     options?: QuestionOption[];
+    mcOptions?: any;
+    mcCorrectOption?: string;
+    content?: string;
+    sortOrder?: number;
 }
 
 export interface MockTest {
@@ -159,6 +168,8 @@ export interface MockTest {
     questionsCount: number;
     createdAt: string;
     updatedAt: string;
+    slug?: string;
+    coverImageUrl?: string;
 }
 
 // History module types

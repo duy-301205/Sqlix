@@ -360,29 +360,19 @@ export default function MockTestHistoryPage() {
 
                 {/* Scrollable Body */}
                 <main className="flex-1 overflow-y-auto px-6 sm:px-8 lg:px-10 py-6 w-full max-w-[1500px] mx-auto space-y-6">
-                    {/* Header Trang & Nút Làm bài thi mới */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                            <div className="flex items-center gap-2.5">
-                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 text-blue-700">
-                                    <Clock className="w-5 h-5" />
-                                </span>
-                                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                                    Lịch sử Thi thử
-                                </h1>
-                            </div>
-                            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">
-                                Lưu trữ toàn bộ kết quả, thống kê tiến độ học tập và xem chi tiết đáp án các lần thi thử SQL của bạn.
-                            </p>
+                    {/* Header Trang */}
+                    <div>
+                        <div className="flex items-center gap-2.5">
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 text-blue-700">
+                                <Clock className="w-5 h-5" />
+                            </span>
+                            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                                Lịch sử Thi thử
+                            </h1>
                         </div>
-
-                        <Link
-                            href="/mock-tests"
-                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs hover:shadow transition-all active:scale-98 shrink-0 cursor-pointer"
-                        >
-                            <BookOpen className="w-4 h-4" />
-                            <span>Khám phá đề thi mới</span>
-                        </Link>
+                        <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">
+                            Lưu trữ toàn bộ kết quả, thống kê tiến độ học tập và xem chi tiết đáp án các lần thi thử SQL của bạn.
+                        </p>
                     </div>
 
                     {/* ================= 4 Thẻ Thống kê (Top Metrics) ================= */}

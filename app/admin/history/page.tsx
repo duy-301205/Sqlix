@@ -1,165 +1,241 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
-import { TestSessionHistory } from '../types';
+import adminHistoryService, {
+    AdminHistoryItem,
+    AdminHistoryFilterParams,
+    AdminHistoryPagination,
+} from '@/services/adminHistoryService';
+import adminMockTestService from '@/services/adminMockTestService';
 import { mockHistorySessions, mockMockTests } from '../mockData';
 
-// Extended mock session records for realistic CMS pagination and filtering
-const initialSessions: TestSessionHistory[] = [
-    ...mockHistorySessions,
-    {
-        id: 'sess-106',
-        sessionId: 'sess-106',
-        userId: 'usr-6',
-        userName: 'Đặng Quốc Huy',
-        userEmail: 'huy.dang@startup.io',
-        userAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-        mockTestId: 'test-1',
-        mockTestTitle: 'Đề thi thử SQL Cơ bản - Đợt 1',
-        score: 9.0,
-        maxScore: 10,
-        isPassed: true,
-        durationSeconds: 1540,
-        startedAt: '2024-03-27T14:10:00Z',
-        submittedAt: '2024-03-27T14:35:40Z',
-        correctAnswersCount: 14,
-        totalQuestionsCount: 15
-    },
-    {
-        id: 'sess-107',
-        sessionId: 'sess-107',
-        userId: 'usr-7',
-        userName: 'Bùi Thị Mai',
-        userEmail: 'mai.bui@techcorp.vn',
-        userAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-        mockTestId: 'test-3',
-        mockTestTitle: 'Database Optimization & Indexing Assessment',
-        score: 5.5,
-        maxScore: 10,
-        isPassed: false,
-        durationSeconds: 2900,
-        startedAt: '2024-03-27T09:00:00Z',
-        submittedAt: '2024-03-27T09:48:20Z',
-        correctAnswersCount: 5,
-        totalQuestionsCount: 10
-    },
-    {
-        id: 'sess-108',
-        sessionId: 'sess-108',
-        userId: 'usr-8',
-        userName: 'Hoàng Văn Nam',
-        userEmail: 'nam.hoang@hust.edu.vn',
-        userAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-        mockTestId: 'test-2',
-        mockTestTitle: 'SQL Advanced Aggregations & Window Functions',
-        score: 8.5,
-        maxScore: 10,
-        isPassed: true,
-        durationSeconds: 2250,
-        startedAt: '2024-03-26T16:20:00Z',
-        submittedAt: '2024-03-26T16:57:30Z',
-        correctAnswersCount: 10,
-        totalQuestionsCount: 12
-    },
-    {
-        id: 'sess-109',
-        sessionId: 'sess-109',
-        userId: 'usr-9',
-        userName: 'Trịnh Cẩm Tú',
-        userEmail: 'tu.trinh@fintech.vn',
-        userAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        mockTestId: 'test-1',
-        mockTestTitle: 'Đề thi thử SQL Cơ bản - Đợt 1',
-        score: 7.5,
-        maxScore: 10,
-        isPassed: true,
-        durationSeconds: 1980,
-        startedAt: '2024-03-26T11:00:00Z',
-        submittedAt: '2024-03-26T11:33:00Z',
-        correctAnswersCount: 11,
-        totalQuestionsCount: 15
-    },
-    {
-        id: 'sess-110',
-        sessionId: 'sess-110',
-        userId: 'usr-10',
-        userName: 'Lý Kiến Quốc',
-        userEmail: 'quoc.ly@dataanalytics.com',
-        userAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-        mockTestId: 'test-3',
-        mockTestTitle: 'Database Optimization & Indexing Assessment',
-        score: 4.0,
-        maxScore: 10,
-        isPassed: false,
-        durationSeconds: 2950,
-        startedAt: '2024-03-25T15:00:00Z',
-        submittedAt: '2024-03-25T15:49:10Z',
-        correctAnswersCount: 4,
-        totalQuestionsCount: 10
-    }
-];
+interface ToastState {
+    message: string;
+    type: 'success' | 'error';
+}
+
+// Chuẩn hóa một bản ghi phiên thi từ Backend hoặc Mock
+const normalizeHistoryItem = (item: any, index: number): AdminHistoryItem => {
+    const rawPassed = item.isPassed !== undefined ? Boolean(item.isPassed) : (Number(item.score || 0) >= 7.0);
+
+    return {
+        id: String(item.id || item.sessionId || `sess-${index + 1}`),
+        sessionId: String(item.sessionId || item.id || `sess-${index + 1}`),
+        userId: String(item.userId || `usr-${index + 1}`),
+        username: item.username || item.userName || `user_${index + 1}`,
+        fullName: item.fullName || item.userName || `Thí sinh ${index + 1}`,
+        userAvatar:
+            item.userAvatar ||
+            item.avatarUrl ||
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        userEmail: item.userEmail || item.email || `${item.username || 'user'}@gmail.com`,
+        mockTestId: item.mockTestId || item.testId || 'test-1',
+        testTitle: item.testTitle || item.mockTestTitle || 'Đề thi thử SQL',
+        score: Number(item.score ?? 0),
+        maxScore: Number(item.maxScore ?? 10),
+        isPassed: rawPassed,
+        status: item.status || 'COMPLETED',
+        durationSeconds: Number(item.durationSeconds ?? 1800),
+        correctAnswersCount: Number(item.correctAnswersCount ?? item.correctCount ?? 8),
+        totalQuestions: Number(item.totalQuestions ?? item.totalQuestionsCount ?? 10),
+        totalQuestionsCount: Number(item.totalQuestionsCount ?? item.totalQuestions ?? 10),
+        startedAt: item.startedAt || new Date(Date.now() - 3600000).toISOString(),
+        submittedAt: item.submittedAt || new Date().toISOString(),
+    };
+};
 
 export default function AdminHistoryPage() {
-    // ================= State =================
-    const [sessions, setSessions] = useState<TestSessionHistory[]>(initialSessions);
+    // ================= State Management =================
+    const [histories, setHistories] = useState<AdminHistoryItem[]>([]);
+    const [mockTestsList, setMockTestsList] = useState<{ id: string; title: string }[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
-    // Filters
-    const [searchUserQuery, setSearchUserQuery] = useState('');
-    const [selectedTestFilter, setSelectedTestFilter] = useState('ALL');
-    const [resultFilter, setResultFilter] = useState<'ALL' | 'PASSED' | 'FAILED'>('ALL');
-    const [scoreRangeFilter, setScoreRangeFilter] = useState<string>('ALL');
+    // Toast State
+    const [toast, setToast] = useState<ToastState | null>(null);
+    const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Pagination
-    const [currentPage, setCurrentPage] = useState(1);
-    const pageSize = 6;
+    const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        setToast({ message, type });
+        toastTimerRef.current = setTimeout(() => {
+            setToast(null);
+        }, 3500);
+    }, []);
+
+    // Pagination State (Backend 0-indexed)
+    const [page, setPage] = useState<number>(0);
+    const [size, setSize] = useState<number>(10);
+    const [pagination, setPagination] = useState<AdminHistoryPagination>({
+        total: 0,
+        page: 0,
+        size: 10,
+        totalPages: 1,
+    });
+
+    // Advanced Filters State
+    const [keyword, setKeyword] = useState<string>('');
+    const [selectedTestId, setSelectedTestId] = useState<string>('ALL');
+    const [statusFilter, setStatusFilter] = useState<string>('ALL');
+    const [isPassedFilter, setIsPassedFilter] = useState<'ALL' | 'PASSED' | 'FAILED'>('ALL');
+    const [fromDate, setFromDate] = useState<string>('');
+    const [toDate, setToDate] = useState<string>('');
+    const [minScore, setMinScore] = useState<string>('');
+    const [maxScore, setMaxScore] = useState<string>('');
 
     // Modals
-    const [viewingSession, setViewingSession] = useState<TestSessionHistory | null>(null);
-    const [deletingSession, setDeletingSession] = useState<TestSessionHistory | null>(null);
+    const [viewingSession, setViewingSession] = useState<AdminHistoryItem | null>(null);
+    const [deletingSession, setDeletingSession] = useState<AdminHistoryItem | null>(null);
 
-    // ================= Filtering Logic =================
-    const filteredSessions = useMemo(() => {
-        return sessions.filter((s) => {
-            // Search query by student name, email, or session ID
-            const matchesSearch =
-                s.userName.toLowerCase().includes(searchUserQuery.toLowerCase()) ||
-                s.userEmail.toLowerCase().includes(searchUserQuery.toLowerCase()) ||
-                s.sessionId.toLowerCase().includes(searchUserQuery.toLowerCase()) ||
-                s.mockTestTitle.toLowerCase().includes(searchUserQuery.toLowerCase());
+    // ================= Fetch Data =================
 
-            // Test filter
-            const matchesTest =
-                selectedTestFilter === 'ALL' || s.mockTestId === selectedTestFilter;
-
-            // Result status filter
-            const matchesResult =
-                resultFilter === 'ALL' ||
-                (resultFilter === 'PASSED' && s.isPassed) ||
-                (resultFilter === 'FAILED' && !s.isPassed);
-
-            // Score range filter
-            let matchesScore = true;
-            if (scoreRangeFilter === 'EXCELLENT') {
-                matchesScore = s.score >= 9.0;
-            } else if (scoreRangeFilter === 'GOOD') {
-                matchesScore = s.score >= 7.0 && s.score < 9.0;
-            } else if (scoreRangeFilter === 'AVERAGE') {
-                matchesScore = s.score >= 5.0 && s.score < 7.0;
-            } else if (scoreRangeFilter === 'POOR') {
-                matchesScore = s.score < 5.0;
+    // 1. Fetch available mock tests for dropdown filter
+    const fetchAvailableTests = useCallback(async () => {
+        try {
+            const rawTests = await adminMockTestService.getAdminMockTests();
+            if (Array.isArray(rawTests) && rawTests.length > 0) {
+                setMockTestsList(rawTests.map((t) => ({ id: t.id, title: t.title })));
+            } else {
+                setMockTestsList(mockMockTests.map((t) => ({ id: t.id, title: t.title })));
             }
+        } catch {
+            setMockTestsList(mockMockTests.map((t) => ({ id: t.id, title: t.title })));
+        }
+    }, []);
 
-            return matchesSearch && matchesTest && matchesResult && matchesScore;
-        });
-    }, [sessions, searchUserQuery, selectedTestFilter, resultFilter, scoreRangeFilter]);
+    // 2. Fetch history records from API
+    const fetchHistories = useCallback(async () => {
+        setIsLoading(true);
 
-    // Paginated sessions
-    const totalPages = Math.ceil(filteredSessions.length / pageSize) || 1;
-    const paginatedSessions = useMemo(() => {
-        const start = (currentPage - 1) * pageSize;
-        return filteredSessions.slice(start, start + pageSize);
-    }, [filteredSessions, currentPage]);
+        // Build query params
+        const params: AdminHistoryFilterParams = {
+            page,
+            size,
+        };
+
+        if (keyword.trim()) params.keyword = keyword.trim();
+        if (selectedTestId !== 'ALL') params.testId = selectedTestId;
+        if (statusFilter !== 'ALL') params.status = statusFilter;
+        if (isPassedFilter === 'PASSED') params.status = 'PASSED';
+        if (isPassedFilter === 'FAILED') params.status = 'FAILED';
+
+        if (fromDate) {
+            params.fromDate = new Date(`${fromDate}T00:00:00Z`).toISOString();
+        }
+        if (toDate) {
+            params.toDate = new Date(`${toDate}T23:59:59Z`).toISOString();
+        }
+
+        if (minScore !== '') params.minScore = Number(minScore);
+        if (maxScore !== '') params.maxScore = Number(maxScore);
+
+        try {
+            const res = await adminHistoryService.getAllHistories(params);
+
+            if (res && Array.isArray(res.items) && res.items.length > 0) {
+                const normalized = res.items.map((item, idx) => normalizeHistoryItem(item, idx));
+                setHistories(normalized);
+                setPagination(res.pagination);
+            } else {
+                // Fallback filtering on mock data if API returns empty
+                let filteredMock = mockHistorySessions.map((item, idx) => normalizeHistoryItem(item, idx));
+
+                if (keyword.trim()) {
+                    const kw = keyword.trim().toLowerCase();
+                    filteredMock = filteredMock.filter(
+                        (s) =>
+                            s.userName.toLowerCase().includes(kw) ||
+                            s.userEmail?.toLowerCase().includes(kw) ||
+                            s.sessionId.toLowerCase().includes(kw) ||
+                            s.testTitle.toLowerCase().includes(kw)
+                    );
+                }
+
+                if (selectedTestId !== 'ALL') {
+                    filteredMock = filteredMock.filter((s) => s.mockTestId === selectedTestId);
+                }
+
+                if (isPassedFilter === 'PASSED') {
+                    filteredMock = filteredMock.filter((s) => s.isPassed);
+                } else if (isPassedFilter === 'FAILED') {
+                    filteredMock = filteredMock.filter((s) => !s.isPassed);
+                }
+
+                if (minScore !== '') {
+                    filteredMock = filteredMock.filter((s) => s.score >= Number(minScore));
+                }
+                if (maxScore !== '') {
+                    filteredMock = filteredMock.filter((s) => s.score <= Number(maxScore));
+                }
+
+                const total = filteredMock.length;
+                const totalPages = Math.max(1, Math.ceil(total / size));
+                const start = page * size;
+                const pageItems = filteredMock.slice(start, start + size);
+
+                setHistories(pageItems);
+                setPagination({
+                    total,
+                    page,
+                    size,
+                    totalPages,
+                });
+            }
+        } catch (err) {
+            console.warn('[AdminHistory] Lỗi fetch lịch sử từ API, dùng mock fallback:', err);
+            const normalizedMock = mockHistorySessions.map((item, idx) => normalizeHistoryItem(item, idx));
+            setHistories(normalizedMock);
+            setPagination({
+                total: normalizedMock.length,
+                page: 0,
+                size: 10,
+                totalPages: Math.max(1, Math.ceil(normalizedMock.length / 10)),
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [page, size, keyword, selectedTestId, statusFilter, isPassedFilter, fromDate, toDate, minScore, maxScore]);
+
+    useEffect(() => {
+        fetchAvailableTests();
+    }, [fetchAvailableTests]);
+
+    useEffect(() => {
+        fetchHistories();
+    }, [fetchHistories]);
+
+    // Reset all filters
+    const handleResetFilters = () => {
+        setKeyword('');
+        setSelectedTestId('ALL');
+        setStatusFilter('ALL');
+        setIsPassedFilter('ALL');
+        setFromDate('');
+        setToDate('');
+        setMinScore('');
+        setMaxScore('');
+        setPage(0);
+    };
+
+    // ================= Delete Session =================
+    const handleConfirmDeleteSession = async () => {
+        if (!deletingSession) return;
+
+        setIsDeleting(true);
+        try {
+            await adminHistoryService.deleteTestSession(deletingSession.sessionId);
+            showToast(`Đã xóa phiên thi #${deletingSession.sessionId} thành công!`, 'success');
+            setDeletingSession(null);
+            await fetchHistories();
+        } catch (err: any) {
+            console.error('[AdminHistory] Lỗi khi xóa phiên thi:', err);
+            const msg = err.response?.data?.message || err.message || 'Lỗi khi xóa phiên thi!';
+            showToast(msg, 'error');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     // Format helper for duration
     const formatDuration = (seconds: number) => {
@@ -169,61 +245,86 @@ export default function AdminHistoryPage() {
     };
 
     // Format helper for timestamp
-    const formatDateTime = (isoString: string) => {
-        const d = new Date(isoString);
-        return d.toLocaleString('vi-VN', {
-            hour: '2-digit',
-            minute: '2-digit',
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
-    };
-
-    // ================= Delete Session Handler =================
-    const handleConfirmDeleteSession = () => {
-        if (!deletingSession) return;
-        console.log(`[API DELETE]: /api/admin/test-sessions/${deletingSession.sessionId}`);
-
-        setSessions((prev) => prev.filter((s) => s.id !== deletingSession.id));
-        setDeletingSession(null);
-
-        // Adjust page if needed
-        if (paginatedSessions.length === 1 && currentPage > 1) {
-            setCurrentPage((p) => p - 1);
+    const formatDateTime = (isoString?: string) => {
+        if (!isoString) return '--';
+        try {
+            const d = new Date(isoString);
+            return d.toLocaleString('vi-VN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+            });
+        } catch {
+            return isoString;
         }
     };
 
-    // Export report handler
-    const handleExportReport = () => {
-        console.log('[API GET]: /api/admin/mock-tests/history/export?format=csv');
-        alert(`Đã chuẩn bị tải về báo cáo lịch sử thi (${filteredSessions.length} bản ghi theo bộ lọc)!`);
-    };
-
-    // KPI Metrics
-    const totalAttempts = sessions.length;
-    const totalPassed = sessions.filter((s) => s.isPassed).length;
-    const passRate = totalAttempts ? Math.round((totalPassed / totalAttempts) * 100) : 0;
-    const averageScore = totalAttempts
-        ? (sessions.reduce((acc, curr) => acc + curr.score, 0) / totalAttempts).toFixed(1)
-        : '0.0';
-    const totalHoursSpent = totalAttempts
-        ? Math.round(sessions.reduce((acc, curr) => acc + curr.durationSeconds, 0) / 3600)
+    // KPI Metrics calculation
+    const totalAttempts = pagination.total || histories.length;
+    const totalPassed = histories.filter((s) => s.isPassed).length;
+    const passRate = histories.length
+        ? Math.round((totalPassed / histories.length) * 100)
         : 0;
+    const averageScore = histories.length
+        ? (histories.reduce((acc, curr) => acc + curr.score, 0) / histories.length).toFixed(1)
+        : '0.0';
 
     return (
         <main className="flex-1 overflow-y-auto px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8 min-w-0">
-            {/* Top Action Bar */}
-            <div className="flex items-center justify-end">
-                <button
-                    onClick={handleExportReport}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 rounded-xl font-bold text-xs sm:text-sm shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+            {/* Toast Notification Banner */}
+            {toast && (
+                <div
+                    className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-bold transition-all animate-in fade-in slide-in-from-top-4 duration-200 ${
+                        toast.type === 'success'
+                            ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-500/20'
+                            : 'bg-rose-600 text-white border-rose-500 shadow-rose-500/20'
+                    }`}
                 >
-                    <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span>Xuất Báo Cáo (CSV)</span>
-                </button>
+                    {toast.type === 'success' ? (
+                        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                        </svg>
+                    ) : (
+                        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    )}
+                    <span>{toast.message}</span>
+                    <button
+                        onClick={() => setToast(null)}
+                        className="ml-2 hover:opacity-80 p-0.5 rounded cursor-pointer"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            )}
+
+            {/* Top Action Bar & Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+                        Quản Trị Lịch Sử Thi Thử
+                    </h1>
+                    <p className="text-xs text-slate-500 mt-1">
+                        Theo dõi kết quả làm bài của học viên, phân tích tỷ lệ đạt và quản lý các phiên thi
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleResetFilters}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 rounded-xl font-bold text-xs shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+                    >
+                        <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span>Đặt lại bộ lọc</span>
+                    </button>
+                </div>
             </div>
 
             {/* KPI Summary Cards */}
@@ -234,7 +335,7 @@ export default function AdminHistoryPage() {
                             Tổng Lượt Nộp Bài
                         </span>
                         <span className="text-2xl font-black text-slate-900">{totalAttempts}</span>
-                        <span className="text-xs text-slate-400 block mt-0.5">phiên thi hoàn thành</span>
+                        <span className="text-xs text-slate-400 block mt-0.5">phiên thi hệ thống</span>
                     </div>
                     <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg">
                         📋
@@ -275,10 +376,10 @@ export default function AdminHistoryPage() {
                 <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex items-center justify-between">
                     <div>
                         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                            Thời Gian Làm Bài
+                            Quy Mô Đang Hiển Thị
                         </span>
-                        <span className="text-2xl font-black text-purple-600">~{totalHoursSpent} giờ</span>
-                        <span className="text-xs text-slate-400 block mt-0.5">tổng thời gian làm bài</span>
+                        <span className="text-2xl font-black text-purple-600">{histories.length}</span>
+                        <span className="text-xs text-slate-400 block mt-0.5">trang {page + 1}/{pagination.totalPages}</span>
                     </div>
                     <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-lg">
                         ⏱️
@@ -286,83 +387,174 @@ export default function AdminHistoryPage() {
                 </div>
             </div>
 
-            {/* Filter Toolbar */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-4">
-                <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
-                    {/* Search Bar */}
-                    <div className="w-full lg:w-96 flex items-center gap-3 px-3.5 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl focus-within:bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
-                        <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            {/* Advanced Filter Toolbar */}
+            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                         </svg>
-                        <input
-                            type="text"
-                            value={searchUserQuery}
+                        <span>Bộ Lọc Nâng Cao &amp; Tìm Kiếm</span>
+                    </span>
+                </div>
+
+                {/* Filter Grid: Row 1 */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {/* Keyword Search */}
+                    <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                            Tìm học viên / Email / Mã phiên
+                        </label>
+                        <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl focus-within:bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+                            <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input
+                                type="text"
+                                value={keyword}
+                                onChange={(e) => {
+                                    setKeyword(e.target.value);
+                                    setPage(0);
+                                }}
+                                placeholder="Nhập tên, email hoặc mã phiên..."
+                                className="w-full bg-transparent border-none p-0 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Mock Test Dropdown */}
+                    <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                            Đề thi thử (Test ID)
+                        </label>
+                        <select
+                            value={selectedTestId}
                             onChange={(e) => {
-                                setSearchUserQuery(e.target.value);
-                                setCurrentPage(1);
+                                setSelectedTestId(e.target.value);
+                                setPage(0);
                             }}
-                            placeholder="Tìm theo học viên, email, mã phiên..."
-                            className="w-full bg-transparent border-none p-0 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                            className="w-full text-xs font-semibold bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer truncate"
+                        >
+                            <option value="ALL">Tất cả đề thi</option>
+                            {mockTestsList.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                    {t.title}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Result Filter */}
+                    <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                            Kết quả (isPassed)
+                        </label>
+                        <select
+                            value={isPassedFilter}
+                            onChange={(e) => {
+                                setIsPassedFilter(e.target.value as any);
+                                setPage(0);
+                            }}
+                            className="w-full text-xs font-semibold bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+                        >
+                            <option value="ALL">Tất cả kết quả</option>
+                            <option value="PASSED">Đạt yêu cầu (Passed)</option>
+                            <option value="FAILED">Chưa đạt (Failed)</option>
+                        </select>
+                    </div>
+
+                    {/* Status Filter */}
+                    <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                            Trạng thái phiên thi
+                        </label>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => {
+                                setStatusFilter(e.target.value);
+                                setPage(0);
+                            }}
+                            className="w-full text-xs font-semibold bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+                        >
+                            <option value="ALL">Tất cả trạng thái</option>
+                            <option value="COMPLETED">Đã nộp bài (COMPLETED)</option>
+                            <option value="IN_PROGRESS">Đang làm dở (IN_PROGRESS)</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* Filter Grid: Row 2 (Date Pickers & Score Range) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+                    {/* From Date */}
+                    <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                            Từ ngày (fromDate)
+                        </label>
+                        <input
+                            type="date"
+                            value={fromDate}
+                            onChange={(e) => {
+                                setFromDate(e.target.value);
+                                setPage(0);
+                            }}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200/80 text-xs bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                         />
                     </div>
 
-                    {/* Filter Dropdowns */}
-                    <div className="w-full lg:w-auto flex flex-wrap items-center gap-3">
-                        {/* Mock Test Filter */}
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-semibold text-slate-500">Đề thi:</span>
-                            <select
-                                value={selectedTestFilter}
-                                onChange={(e) => {
-                                    setSelectedTestFilter(e.target.value);
-                                    setCurrentPage(1);
-                                }}
-                                className="text-xs font-semibold bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer max-w-[200px] truncate"
-                            >
-                                <option value="ALL">Tất cả đề thi</option>
-                                {mockMockTests.map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                        {t.title}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                    {/* To Date */}
+                    <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                            Đến ngày (toDate)
+                        </label>
+                        <input
+                            type="date"
+                            value={toDate}
+                            onChange={(e) => {
+                                setToDate(e.target.value);
+                                setPage(0);
+                            }}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200/80 text-xs bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        />
+                    </div>
 
-                        {/* Result Filter */}
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-semibold text-slate-500">Kết quả:</span>
-                            <select
-                                value={resultFilter}
-                                onChange={(e) => {
-                                    setResultFilter(e.target.value as any);
-                                    setCurrentPage(1);
-                                }}
-                                className="text-xs font-semibold bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
-                            >
-                                <option value="ALL">Tất cả kết quả</option>
-                                <option value="PASSED">Đạt yêu cầu (Passed)</option>
-                                <option value="FAILED">Chưa đạt (Failed)</option>
-                            </select>
-                        </div>
+                    {/* Min Score */}
+                    <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                            Điểm tối thiểu (minScore)
+                        </label>
+                        <input
+                            type="number"
+                            min="0"
+                            max="10"
+                            step="0.5"
+                            value={minScore}
+                            onChange={(e) => {
+                                setMinScore(e.target.value);
+                                setPage(0);
+                            }}
+                            placeholder="0.0"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200/80 text-xs bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        />
+                    </div>
 
-                        {/* Score Range Filter */}
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-semibold text-slate-500">Thang điểm:</span>
-                            <select
-                                value={scoreRangeFilter}
-                                onChange={(e) => {
-                                    setScoreRangeFilter(e.target.value);
-                                    setCurrentPage(1);
-                                }}
-                                className="text-xs font-semibold bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
-                            >
-                                <option value="ALL">Tất cả điểm</option>
-                                <option value="EXCELLENT">Xuất sắc (≥ 9.0)</option>
-                                <option value="GOOD">Khá - Giỏi (7.0 - 8.9)</option>
-                                <option value="AVERAGE">Trung bình (5.0 - 6.9)</option>
-                                <option value="POOR">Chưa đạt (&lt; 5.0)</option>
-                            </select>
-                        </div>
+                    {/* Max Score */}
+                    <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                            Điểm tối đa (maxScore)
+                        </label>
+                        <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.5"
+                            value={maxScore}
+                            onChange={(e) => {
+                                setMaxScore(e.target.value);
+                                setPage(0);
+                            }}
+                            placeholder="10.0"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200/80 text-xs bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        />
                     </div>
                 </div>
             </div>
@@ -378,24 +570,34 @@ export default function AdminHistoryPage() {
                                 <th className="py-4 px-6">Đề thi</th>
                                 <th className="py-4 px-6 text-center">Điểm số</th>
                                 <th className="py-4 px-6 text-center">Kết quả</th>
+                                <th className="py-4 px-6 text-center">Trạng thái</th>
                                 <th className="py-4 px-6 text-center">Thời gian làm</th>
                                 <th className="py-4 px-6">Thời gian nộp</th>
                                 <th className="py-4 px-6 text-right">Hành động</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-sm">
-                            {paginatedSessions.length === 0 ? (
+                            {isLoading ? (
                                 <tr>
-                                    <td colSpan={8} className="py-12 text-center text-slate-400 text-xs">
+                                    <td colSpan={9} className="py-12 text-center text-slate-400 text-xs">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
+                                            <span>Đang tải danh sách lịch sử thi...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : histories.length === 0 ? (
+                                <tr>
+                                    <td colSpan={9} className="py-12 text-center text-slate-400 text-xs">
                                         Không tìm thấy phiên thi nào phù hợp với bộ lọc hiện tại.
                                     </td>
                                 </tr>
                             ) : (
-                                paginatedSessions.map((s) => (
-                                    <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
+                                histories.map((s) => (
+                                    <tr key={s.sessionId} className="hover:bg-slate-50/70 transition-colors">
                                         {/* Session ID */}
                                         <td className="py-4 px-6">
-                                            <span className="font-mono text-xs font-bold text-slate-400">
+                                            <span className="font-mono text-xs font-bold text-slate-500">
                                                 #{s.sessionId}
                                             </span>
                                         </td>
@@ -405,8 +607,8 @@ export default function AdminHistoryPage() {
                                             <div className="flex items-center gap-3">
                                                 <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
                                                     <Image
-                                                        src={s.userAvatar}
-                                                        alt={s.userName}
+                                                        src={s.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                                                        alt={s.fullName}
                                                         width={36}
                                                         height={36}
                                                         className="w-full h-full object-cover"
@@ -415,22 +617,22 @@ export default function AdminHistoryPage() {
                                                 </div>
                                                 <div>
                                                     <p className="font-bold text-slate-900 leading-snug">
-                                                        {s.userName}
+                                                        {s.fullName}
                                                     </p>
                                                     <p className="text-xs text-slate-400">
-                                                        {s.userEmail}
+                                                        {s.userEmail || s.username}
                                                     </p>
                                                 </div>
                                             </div>
                                         </td>
 
                                         {/* Exam Title */}
-                                        <td className="py-4 px-6">
+                                        <td className="py-4 px-6 max-w-xs">
                                             <p className="font-semibold text-slate-800 line-clamp-1">
-                                                {s.mockTestTitle}
+                                                {s.testTitle}
                                             </p>
                                             <span className="text-[11px] text-slate-400">
-                                                Đúng {s.correctAnswersCount} / {s.totalQuestionsCount} câu
+                                                Đúng {s.correctAnswersCount ?? 0} / {s.totalQuestionsCount ?? 10} câu
                                             </span>
                                         </td>
 
@@ -440,17 +642,17 @@ export default function AdminHistoryPage() {
                                                 <span className={`text-base ${
                                                     s.score >= 8.0
                                                         ? 'text-emerald-600'
-                                                        : s.score >= 6.0
+                                                        : s.score >= 5.0
                                                         ? 'text-blue-600'
                                                         : 'text-rose-600'
                                                 }`}>
                                                     {s.score}
                                                 </span>
-                                                <span className="text-xs text-slate-400">/ {s.maxScore}</span>
+                                                <span className="text-xs text-slate-400">/ {s.maxScore || 10}</span>
                                             </div>
                                         </td>
 
-                                        {/* Result Badge */}
+                                        {/* isPassed Badge */}
                                         <td className="py-4 px-6 text-center">
                                             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
                                                 s.isPassed
@@ -458,6 +660,13 @@ export default function AdminHistoryPage() {
                                                     : 'bg-rose-50 text-rose-700 border border-rose-200'
                                             }`}>
                                                 {s.isPassed ? '✓ ĐẠT' : '✕ CHƯA ĐẠT'}
+                                            </span>
+                                        </td>
+
+                                        {/* Status Badge */}
+                                        <td className="py-4 px-6 text-center">
+                                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 uppercase">
+                                                {s.status}
                                             </span>
                                         </td>
 
@@ -471,7 +680,7 @@ export default function AdminHistoryPage() {
                                             {formatDateTime(s.submittedAt)}
                                         </td>
 
-                                        {/* Action buttons */}
+                                        {/* Actions */}
                                         <td className="py-4 px-6 text-right">
                                             <div className="flex items-center justify-end gap-1.5">
                                                 <button
@@ -488,7 +697,7 @@ export default function AdminHistoryPage() {
                                                 <button
                                                     onClick={() => setDeletingSession(s)}
                                                     className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                                                    title="Xóa phiên thi"
+                                                    title="Xóa phiên thi này"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -504,40 +713,40 @@ export default function AdminHistoryPage() {
                 </div>
 
                 {/* Pagination Footer */}
-                {filteredSessions.length > 0 && (
+                {pagination.total > 0 && (
                     <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-500">
                         <div>
-                            Hiển thị {(currentPage - 1) * pageSize + 1} -{' '}
-                            {Math.min(currentPage * pageSize, filteredSessions.length)} trên tổng số{' '}
-                            {filteredSessions.length} phiên thi
+                            Hiển thị {page * size + 1} -{' '}
+                            {Math.min((page + 1) * size, pagination.total)} trên tổng số{' '}
+                            {pagination.total} phiên thi
                         </div>
 
                         <div className="flex items-center gap-1.5">
                             <button
-                                disabled={currentPage === 1}
-                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                disabled={page === 0}
+                                onClick={() => setPage((p) => Math.max(0, p - 1))}
                                 className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none cursor-pointer transition-colors"
                             >
                                 Trước
                             </button>
 
-                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                            {Array.from({ length: Math.min(pagination.totalPages, 7) }, (_, i) => i).map((pIndex) => (
                                 <button
-                                    key={page}
-                                    onClick={() => setCurrentPage(page)}
+                                    key={pIndex}
+                                    onClick={() => setPage(pIndex)}
                                     className={`w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                        currentPage === page
+                                        page === pIndex
                                             ? 'bg-blue-600 text-white shadow-xs shadow-blue-500/20'
                                             : 'border border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
                                     }`}
                                 >
-                                    {page}
+                                    {pIndex + 1}
                                 </button>
                             ))}
 
                             <button
-                                disabled={currentPage === totalPages}
-                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                disabled={page >= pagination.totalPages - 1}
+                                onClick={() => setPage((p) => Math.min(pagination.totalPages - 1, p + 1))}
                                 className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none cursor-pointer transition-colors"
                             >
                                 Sau
@@ -548,7 +757,7 @@ export default function AdminHistoryPage() {
             </div>
 
             {/* ========================================================================= */}
-            {/* MODAL: VIEW SESSION DETAILS (Height 93vh, Accent Border)                  */}
+            {/* MODAL: VIEW SESSION DETAILS                                               */}
             {/* ========================================================================= */}
             {viewingSession && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/60 backdrop-blur-sm">
@@ -604,8 +813,8 @@ export default function AdminHistoryPage() {
                                 <div className="flex items-center gap-3.5">
                                     <div className="w-12 h-12 rounded-full overflow-hidden bg-white border border-slate-200 shrink-0">
                                         <Image
-                                            src={viewingSession.userAvatar}
-                                            alt={viewingSession.userName}
+                                            src={viewingSession.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                                            alt={viewingSession.fullName}
                                             width={48}
                                             height={48}
                                             className="w-full h-full object-cover"
@@ -614,10 +823,10 @@ export default function AdminHistoryPage() {
                                     </div>
                                     <div>
                                         <p className="font-black text-slate-900 text-base">
-                                            {viewingSession.userName}
+                                            {viewingSession.fullName}
                                         </p>
                                         <p className="text-xs text-slate-400">
-                                            {viewingSession.userEmail}
+                                            {viewingSession.userEmail || viewingSession.username}
                                         </p>
                                         <span className="text-[11px] text-blue-600 font-semibold block mt-0.5">
                                             Mã thí sinh: {viewingSession.userId}
@@ -630,7 +839,7 @@ export default function AdminHistoryPage() {
                                         Đề thi thực hiện
                                     </span>
                                     <p className="font-bold text-slate-800 text-sm mt-0.5">
-                                        {viewingSession.mockTestTitle}
+                                        {viewingSession.testTitle}
                                     </p>
                                     <span className="text-xs text-slate-400 block mt-0.5">
                                         Nộp bài: {formatDateTime(viewingSession.submittedAt)}
@@ -647,7 +856,7 @@ export default function AdminHistoryPage() {
                                     <span className={`text-2xl font-black mt-1 block ${
                                         viewingSession.isPassed ? 'text-emerald-600' : 'text-rose-600'
                                     }`}>
-                                        {viewingSession.score} / {viewingSession.maxScore}
+                                        {viewingSession.score} / {viewingSession.maxScore || 10}
                                     </span>
                                 </div>
 
@@ -656,7 +865,7 @@ export default function AdminHistoryPage() {
                                         Số Câu Đúng
                                     </span>
                                     <span className="text-2xl font-black text-slate-900 mt-1 block">
-                                        {viewingSession.correctAnswersCount} / {viewingSession.totalQuestionsCount}
+                                        {viewingSession.correctAnswersCount ?? 0} / {viewingSession.totalQuestionsCount ?? 10}
                                     </span>
                                 </div>
 
@@ -671,10 +880,10 @@ export default function AdminHistoryPage() {
 
                                 <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs">
                                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                                        Tỷ Lệ Chính Xác
+                                        Trạng Thái
                                     </span>
-                                    <span className="text-2xl font-black text-blue-600 mt-1 block">
-                                        {Math.round((viewingSession.correctAnswersCount / viewingSession.totalQuestionsCount) * 100)}%
+                                    <span className="text-lg font-black text-blue-600 mt-1 block uppercase">
+                                        {viewingSession.status}
                                     </span>
                                 </div>
                             </div>
@@ -704,9 +913,6 @@ export default function AdminHistoryPage() {
                                             Hoàn tất 100%
                                         </span>
                                     </div>
-                                    <div className="pt-2 border-t border-slate-200 text-slate-500 leading-relaxed italic">
-                                        * Lưu ý Quản trị viên: Toàn bộ câu truy vấn SQL và lịch sử tick trắc nghiệm của học viên đã được lưu trữ trong log engine chấm điểm.
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -730,7 +936,7 @@ export default function AdminHistoryPage() {
             {/* ========================================================================= */}
             {deletingSession && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-                    <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200">
+                    <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
                         <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -742,23 +948,30 @@ export default function AdminHistoryPage() {
                         </h3>
                         <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                             Bạn có chắc chắn muốn xóa phiên thi của thí sinh{' '}
-                            <strong className="text-slate-800">{deletingSession.userName}</strong> (Đề:{' '}
-                            <span className="font-semibold text-slate-800">{deletingSession.mockTestTitle}</span>
+                            <strong className="text-slate-800">{deletingSession.fullName}</strong> (Đề:{' '}
+                            <span className="font-semibold text-slate-800">{deletingSession.testTitle}</span>
                             )? Kết quả thi và lịch sử điểm số của phiên thi này sẽ bị xóa khỏi hệ thống.
                         </p>
 
                         <div className="mt-6 flex items-center justify-end gap-3">
                             <button
+                                type="button"
+                                disabled={isDeleting}
                                 onClick={() => setDeletingSession(null)}
                                 className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
                             >
                                 Hủy bỏ
                             </button>
                             <button
+                                type="button"
+                                disabled={isDeleting}
                                 onClick={handleConfirmDeleteSession}
-                                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition-all cursor-pointer"
+                                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition-all cursor-pointer flex items-center gap-1.5"
                             >
-                                Xác nhận xóa
+                                {isDeleting && (
+                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                )}
+                                <span>Xác nhận xóa</span>
                             </button>
                         </div>
                     </div>
