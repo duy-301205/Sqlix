@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { DatabaseDetail, TableSchema, DATABASES_DETAIL } from '../data';
 
 interface ErdTabProps {
-    dbData?: DatabaseDetail;
+    dbData?: DatabaseDetail | any;
+    schemaData?: any;
     compact?: boolean;
     diagramOnly?: boolean; // Cờ chỉ render sơ đồ, ẩn sidebar thông tin
 }
@@ -127,18 +128,30 @@ const COLOR_SCHEMES = [
     { border: 'border-purple-300', headerBg: 'bg-[#f5eefc]', headerBorder: 'border-purple-200' },
 ];
 
-export default function ErdTab({ dbData, compact = false, diagramOnly = false }: ErdTabProps) {
+export default function ErdTab({ dbData, schemaData, compact = false, diagramOnly = false }: ErdTabProps) {
     const [zoomLevel, setZoomLevel] = useState<number>(100);
 
     const currentDb = dbData || DATABASES_DETAIL.ecommerce;
-    const tablesList = currentDb.tables && currentDb.tables.length > 0
+    const tablesList = (schemaData && schemaData.tables && schemaData.tables.length > 0)
+        ? schemaData.tables
+        : currentDb.tables && currentDb.tables.length > 0
         ? currentDb.tables
         : DATABASES_DETAIL.ecommerce.tables;
 
     const totalTables = tablesList.length;
-    const totalRelations = currentDb.relationsCount || (currentDb.relationships ? currentDb.relationships.length : 4);
-    const totalAttributes = currentDb.attributesCount || 25;
-    const totalForeignKeys = tablesList.reduce((acc, t) => acc + t.columns.filter((c) => c.isFk).length, 0);
+    const totalRelations =
+        schemaData?.relationships?.length ||
+        schemaData?.relations?.length ||
+        currentDb.relationsCount ||
+        (currentDb.relationships ? currentDb.relationships.length : 4);
+    const totalAttributes =
+        tablesList.reduce((acc: number, t: any) => acc + (t.columns?.length || t.columnsCount || 0), 0) ||
+        currentDb.attributesCount ||
+        25;
+    const totalForeignKeys = tablesList.reduce(
+        (acc: number, t: any) => acc + (t.columns ? t.columns.filter((c: any) => c.isFk).length : 0),
+        0
+    );
 
     const dbLayout = TABLE_LAYOUTS[currentDb.id] || TABLE_LAYOUTS.ecommerce;
 
@@ -368,7 +381,7 @@ export default function ErdTab({ dbData, compact = false, diagramOnly = false }:
                         </svg>
 
                         {/* ================= THẺ BẢNG ================= */}
-                        {tablesList.map((table, idx) => {
+                        {tablesList.map((table: any, idx: number) => {
                             const pos = getTableLayout(table, idx);
                             return (
                                 <div
@@ -392,7 +405,7 @@ export default function ErdTab({ dbData, compact = false, diagramOnly = false }:
                                     </div>
 
                                     <div className="p-2 space-y-1 text-xs bg-white font-sans">
-                                        {table.columns.map((col) => (
+                                        {table.columns.map((col: any) => (
                                             <div
                                                 key={col.name}
                                                 className={`flex justify-between items-center py-0.5 px-1 rounded ${
