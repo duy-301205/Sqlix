@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import adminLearningService from '@/services/adminLearningService';
+import learningService from '@/services/learningService';
 import { LearningCategory, LessonItem, SectionItem } from '../types';
 
 type ModalType = 'CATEGORY' | 'LESSON' | 'SECTION' | null;
@@ -126,6 +127,61 @@ export default function AdminLearningPage() {
         }, 3500);
     }, []);
 
+    // Helper tải chi tiết đầy đủ của bài học (gồm sections, description, objectives) từ API
+    const enrichLessonsWithDetails = useCallback(async (categoriesToEnrich: LearningCategory[]) => {
+        const lessonsToFetch = categoriesToEnrich
+            .flatMap((c) => c.lessons)
+            .filter((l): l is LessonItem & { slug: string } => typeof l.slug === 'string' && l.slug.length > 0);
+        if (lessonsToFetch.length === 0) return;
+
+        try {
+            const results = await Promise.allSettled(
+                lessonsToFetch.map((les) => learningService.getLessonDetail(les.slug))
+            );
+
+            const detailMap = new Map<string, any>();
+            results.forEach((res, index) => {
+                if (res.status === 'fulfilled' && res.value) {
+                    detailMap.set(lessonsToFetch[index].id, res.value);
+                }
+            });
+
+            if (detailMap.size > 0) {
+                setCategories((prevCategories) =>
+                    prevCategories.map((cat) => ({
+                        ...cat,
+                        lessons: cat.lessons.map((les) => {
+                            const detail = detailMap.get(les.id);
+                            if (!detail) return les;
+
+                            const rawSections = Array.isArray(detail.sections) ? detail.sections : [];
+                            const sections: SectionItem[] = rawSections.map((sec: any, sIdx: number) => ({
+                                id: String(sec.id || sec.sectionId || `sec-${sIdx + 1}`),
+                                title: sec.title || `Phần học ${sIdx + 1}`,
+                                orderIndex: sec.orderIndex ?? sec.sortOrder ?? sIdx + 1,
+                                contentMarkdown: sec.contentMarkdown || sec.content || '',
+                                sampleQuery: sec.sampleQuery || sec.sampleSql || '',
+                                expectedResult: sec.expectedResult || '',
+                                durationMinutes: sec.durationMinutes ?? 15,
+                                noteBox: sec.noteBox || null,
+                            }));
+
+                            return {
+                                ...les,
+                                description: detail.description ?? les.description,
+                                objectives: Array.isArray(detail.objectives) ? detail.objectives : les.objectives,
+                                practiceTopicCode: detail.practiceTopicCode ?? les.practiceTopicCode,
+                                sections,
+                            };
+                        }),
+                    }))
+                );
+            }
+        } catch (enrichErr) {
+            console.warn('[AdminLearning] Không thể nạp chi tiết sections:', enrichErr);
+        }
+    }, []);
+
     // 1. Fetch Curriculum từ API
     const fetchCurriculum = useCallback(async () => {
         setIsLoading(true);
@@ -138,6 +194,8 @@ export default function AdminLearningPage() {
                     if (prev && normalized.some((c) => c.id === prev)) return prev;
                     return normalized[0]?.id || null;
                 });
+                // Tự động tải nạp chi tiết các phần học (sections) từ server
+                enrichLessonsWithDetails(normalized);
             } else {
                 setCategories([]);
                 setSelectedCategoryId(null);
@@ -149,7 +207,7 @@ export default function AdminLearningPage() {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [enrichLessonsWithDetails]);
 
     useEffect(() => {
         fetchCurriculum();
@@ -377,11 +435,12 @@ export default function AdminLearningPage() {
             });
         } else {
             setEditingTarget(null);
+            const targetLesson = categories.flatMap((c) => c.lessons).find((l) => l.id === targetLessonId);
             setSectionForm({
                 lessonId: targetLessonId,
                 title: '',
                 durationMinutes: 15,
-                orderIndex: 1,
+                orderIndex: (targetLesson?.sections?.length || 0) + 1,
                 contentMarkdown: '',
                 sampleQuery: '',
                 expectedResult: '',
@@ -410,6 +469,8 @@ export default function AdminLearningPage() {
             } else {
                 await adminLearningService.createSection(sectionForm.lessonId, payload);
                 showToast(`Đã tạo mới section "${sectionForm.title}" thành công!`, 'success');
+                // Tự động mở bài học vừa thêm section để người dùng thấy ngay
+                setExpandedLessons((prev) => ({ ...prev, [sectionForm.lessonId]: true }));
             }
             setActiveModal(null);
             await fetchCurriculum();
