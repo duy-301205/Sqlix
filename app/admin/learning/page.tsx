@@ -43,7 +43,6 @@ const normalizeCurriculumData = (rawList: any[]): LearningCategory[] => {
                 slug: les.slug || les.title?.toLowerCase().replace(/\s+/g, '-') || `bai-hoc-${lIdx + 1}`,
                 description: les.description || '',
                 orderIndex: les.orderIndex ?? les.sortOrder ?? lIdx + 1,
-                difficulty: (les.difficulty || 'BEGINNER') as 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED',
                 isPublished: les.isPublished !== undefined ? Boolean(les.isPublished) : true,
                 objectives: Array.isArray(les.objectives) ? les.objectives : [les.description || les.title],
                 practiceTopicCode: les.practiceTopicCode || 'SQL_BASIC',
@@ -92,7 +91,6 @@ export default function AdminLearningPage() {
         title: '',
         slug: '',
         description: '',
-        difficulty: 'BEGINNER' as 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED',
         orderIndex: 1,
         isPublished: true,
         practiceTopicCode: 'SQL_BASIC',
@@ -268,7 +266,6 @@ export default function AdminLearningPage() {
                 title: lesson.title,
                 slug: (lesson as any).slug || '',
                 description: lesson.description,
-                difficulty: lesson.difficulty,
                 orderIndex: lesson.orderIndex,
                 isPublished: lesson.isPublished,
                 practiceTopicCode: (lesson as any).practiceTopicCode || 'SQL_BASIC',
@@ -282,7 +279,6 @@ export default function AdminLearningPage() {
                 title: '',
                 slug: '',
                 description: '',
-                difficulty: 'BEGINNER',
                 orderIndex: (currentCat?.lessons.length || 0) + 1,
                 isPublished: true,
                 practiceTopicCode: 'SQL_BASIC',
@@ -309,7 +305,6 @@ export default function AdminLearningPage() {
             objectives: objectives.length > 0 ? objectives : [lessonForm.description || lessonForm.title],
             practiceTopicCode: lessonForm.practiceTopicCode || 'SQL_BASIC',
             sortOrder: Number(lessonForm.orderIndex),
-            difficulty: lessonForm.difficulty,
             isPublished: lessonForm.isPublished,
         };
 
@@ -345,7 +340,6 @@ export default function AdminLearningPage() {
                     categoryId: lessonForm.categoryId,
                     title: lessonForm.title,
                     description: lessonForm.description,
-                    difficulty: lessonForm.difficulty,
                     orderIndex: Number(lessonForm.orderIndex),
                     isPublished: lessonForm.isPublished,
                     sections: [],
@@ -755,17 +749,6 @@ export default function AdminLearningPage() {
                                                             <h4 className="text-sm font-bold text-slate-900 truncate">
                                                                 {lesson.title}
                                                             </h4>
-                                                            <span
-                                                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                                                                    lesson.difficulty === 'BEGINNER'
-                                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
-                                                                        : lesson.difficulty === 'INTERMEDIATE'
-                                                                        ? 'bg-amber-50 text-amber-700 border border-amber-200/70'
-                                                                        : 'bg-rose-50 text-rose-700 border border-rose-200/70'
-                                                                }`}
-                                                            >
-                                                                {lesson.difficulty}
-                                                            </span>
                                                             {!lesson.isPublished && (
                                                                 <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
                                                                     Bản nháp
@@ -1073,29 +1056,15 @@ export default function AdminLearningPage() {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">Mức độ khó</label>
-                                        <select
-                                            value={lessonForm.difficulty}
-                                            onChange={(e) => setLessonForm({ ...lessonForm, difficulty: e.target.value as any })}
-                                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white"
-                                        >
-                                            <option value="BEGINNER">BEGINNER (Cơ bản)</option>
-                                            <option value="INTERMEDIATE">INTERMEDIATE (Trung cấp)</option>
-                                            <option value="ADVANCED">ADVANCED (Nâng cao)</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">Thứ tự bài</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            value={lessonForm.orderIndex}
-                                            onChange={(e) => setLessonForm({ ...lessonForm, orderIndex: Number(e.target.value) })}
-                                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                        />
-                                    </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Thứ tự bài</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={lessonForm.orderIndex}
+                                        onChange={(e) => setLessonForm({ ...lessonForm, orderIndex: Number(e.target.value) })}
+                                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    />
                                 </div>
 
                                 <div>

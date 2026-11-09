@@ -74,7 +74,7 @@ export interface LessonItem {
     title: string;
     description: string;
     orderIndex: number;
-    difficulty: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+    difficulty?: string;
     isPublished: boolean;
     sections: SectionItem[];
 }
