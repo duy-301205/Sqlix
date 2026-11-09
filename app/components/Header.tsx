@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import userService, { UserProfile } from '@/services/userService';
-import authService from '@/services/authService';
+import authService, { checkCanAccessAdmin } from '@/services/authService';
 
 interface HeaderProps {
     userName?: string;
@@ -21,9 +21,13 @@ export default function Header({
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
+    const hasFetchedRef = useRef(false);
 
     // Lấy thông tin user hiện tại khi component mount
     useEffect(() => {
+        if (hasFetchedRef.current) return;
+        hasFetchedRef.current = true;
+
         const fetchUserData = async () => {
             const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
             if (!token) return;
@@ -100,7 +104,7 @@ export default function Header({
     const displayName = user?.fullName || user?.username || defaultUserName;
     const displayStreak = user?.streakCount ?? user?.streak ?? defaultStreakCount;
     const avatarUrl = user?.avatarUrl || user?.avatar || 'https://lh3.googleusercontent.com/aida-public/AB6AXuA5s5gKn-GLKNAcWX9EFxyoYiTB5P4nSlHOI-1xfIgZeQsJ-r6VomssBqEWxVxf1x6An_7eTmstH3JQg7MKykFsZYIiXmy79nQtx5w5ttWLQIfnSMUTq90KVF2u89D6vK7mBb_dvZwHu_MhOck-Fkp_KdrFxPRZ_xmi6VeVbbXxjdepfIMNmsdpS4AyKZyt6weuqVVp_G3ciu6_0akcgzTF5K2MjVGgLmJYTT81_BgzxZc6cDDdmOla';
-    const isAdmin = user?.role === 'ADMIN';
+    const canAccessAdmin = checkCanAccessAdmin(user?.role);
 
     return (
         <header className="flex justify-between items-center w-full px-6 md:px-10 py-5 bg-[#f8f9ff]/80 backdrop-blur-md sticky top-0 z-20 border-b border-slate-200/60 shrink-0">
@@ -116,8 +120,8 @@ export default function Header({
 
             {/* Right: Actions (Admin Portal, Streak, Notifications, User Menu) */}
             <div className="flex items-center gap-3 sm:gap-4">
-                {/* Admin Portal Shortcut Button */}
-                {isAdmin && (
+                {/* Admin Portal Shortcut Button - Chỉ hiển thị cho Admin hoặc Giáo viên */}
+                {canAccessAdmin && (
                     <Link
                         href="/admin/dashboard"
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-full text-xs font-bold transition-all shadow-2xs"

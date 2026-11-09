@@ -1,38 +1,98 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useCallback } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
-import { DATABASES_DETAIL, DatabaseDetail } from './data';
+import { DATABASES_DETAIL } from './data';
 import { DATABASE_EXERCISES } from './exercisesData';
 import OverviewTab from './components/OverviewTab';
 import ErdTab from './components/ErdTab';
 import QuestionsTab from './components/QuestionsTab';
+import practiceService, { PracticeDatabaseDetail } from '@/services/practiceService';
 
 interface PageProps {
     params: Promise<{ id: string }>;
 }
 
+const getDifficultyColor = (diff: string | undefined): string => {
+    const d = (diff || '').toLowerCase();
+    if (d.includes('dễ') || d.includes('easy')) {
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    }
+    if (d.includes('khó') || d.includes('hard')) {
+        return 'bg-rose-50 text-rose-700 border-rose-200';
+    }
+    return 'bg-blue-50 text-blue-700 border-blue-200';
+};
+
 export default function PracticeDetailPage({ params }: PageProps) {
     const resolvedParams = use(params);
-    const dbId = resolvedParams.id || 'ecommerce';
-
-    const dbData: DatabaseDetail =
-        DATABASES_DETAIL[dbId] || DATABASES_DETAIL.ecommerce;
+    const dbSlug = resolvedParams.id || 'ecommerce';
 
     const [mounted, setMounted] = useState(false);
     const [activeTab, setActiveTab] = useState<'overview' | 'erd' | 'questions'>('questions');
 
-    const totalExercises = DATABASE_EXERCISES[dbId]?.length || 3;
+    const [dbDetail, setDbDetail] = useState<PracticeDatabaseDetail | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchDatabaseDetail = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const data = await practiceService.getDatabaseDetail(dbSlug);
+            if (data && (data.id || data.slug || data.name)) {
+                setDbDetail(data);
+            } else {
+                throw new Error('Dữ liệu CSDL không đúng định dạng');
+            }
+        } catch (err: any) {
+            console.error(`[Practice] Lỗi khi tải chi tiết CSDL slug="${dbSlug}":`, err);
+
+            // Fallback sang DATABASES_DETAIL mock data
+            const fallbackDetail = DATABASES_DETAIL[dbSlug] || DATABASES_DETAIL.ecommerce;
+            const fallbackExercises = DATABASE_EXERCISES[dbSlug] || DATABASE_EXERCISES.ecommerce || [];
+
+            console.warn(`[Practice] Sử dụng mock data dự phòng cho "${dbSlug}"`);
+            setDbDetail({
+                ...fallbackDetail,
+                slug: fallbackDetail.id,
+                exercises: fallbackExercises as any,
+                schemaData: {
+                    tables: fallbackDetail.tables,
+                    relationships: fallbackDetail.relationships,
+                },
+            } as any);
+
+            setError(err?.response?.data?.message || err?.message || 'Không thể đồng bộ chi tiết CSDL từ máy chủ.');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [dbSlug]);
 
     useEffect(() => {
         setMounted(true);
-    }, []);
+        fetchDatabaseDetail();
+    }, [fetchDatabaseDetail]);
 
     if (!mounted) {
         return <div className="min-h-screen bg-[#f8fafc]" />;
     }
+
+    const currentName = dbDetail?.name || 'Cơ sở dữ liệu';
+    const currentDifficulty = dbDetail?.difficulty || 'Trung bình';
+    const currentDifficultyColor = dbDetail?.difficultyColor || getDifficultyColor(currentDifficulty);
+    const currentSubtitle =
+        dbDetail?.subtitle ||
+        dbDetail?.description ||
+        'Truy vấn và thực hành thao tác trên cơ sở dữ liệu mẫu.';
+    const totalExercises =
+        dbDetail?.exercises?.length ||
+        dbDetail?.exercisesCount ||
+        DATABASE_EXERCISES[dbSlug]?.length ||
+        0;
 
     return (
         <div
@@ -64,30 +124,48 @@ export default function PracticeDetailPage({ params }: PageProps) {
                             Luyện tập
                         </Link>
                         <span className="text-slate-300">/</span>
-                        <span className="text-slate-700">{dbData.name}</span>
+                        <span className="text-slate-700">{currentName}</span>
                         <span className="text-slate-300">/</span>
                         <span className="text-blue-600 font-bold">
-                            {activeTab === 'questions' ? 'Danh sách câu hỏi' : activeTab === 'erd' ? 'Sơ đồ ERD' : 'Tổng quan CSDL'}
+                            {activeTab === 'questions'
+                                ? 'Danh sách câu hỏi'
+                                : activeTab === 'erd'
+                                ? 'Sơ đồ ERD'
+                                : 'Tổng quan CSDL'}
                         </span>
                     </nav>
 
                     {/* Top Action Bar */}
-                    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shrink-0">
-                        <div>
-                            <div className="flex items-center gap-3 mb-1">
-                                <h1 className="text-2xl font-black text-slate-900 tracking-tight">{dbData.name}</h1>
-                                <span className={`px-2.5 py-0.5 rounded text-xs font-bold border ${dbData.difficultyColor}`}>
-                                    {dbData.difficulty}
-                                </span>
+                    {isLoading ? (
+                        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shrink-0 animate-pulse">
+                            <div className="space-y-2 w-2/3">
+                                <div className="h-7 bg-slate-200 rounded w-1/3" />
+                                <div className="h-4 bg-slate-100 rounded w-1/2" />
                             </div>
-                            <p className="text-xs sm:text-sm text-slate-500">{dbData.subtitle}</p>
+                            <div className="h-8 bg-slate-100 rounded-xl w-36" />
                         </div>
+                    ) : (
+                        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shrink-0">
+                            <div>
+                                <div className="flex items-center gap-3 mb-1">
+                                    <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+                                        {currentName}
+                                    </h1>
+                                    <span
+                                        className={`px-2.5 py-0.5 rounded text-xs font-bold border ${currentDifficultyColor}`}
+                                    >
+                                        {currentDifficulty}
+                                    </span>
+                                </div>
+                                <p className="text-xs sm:text-sm text-slate-500">{currentSubtitle}</p>
+                            </div>
 
-                        <div className="flex items-center gap-2 px-3.5 py-2 bg-blue-50 border border-blue-100 rounded-xl text-xs font-bold text-blue-700">
-                            <span>📚</span>
-                            <span>{totalExercises} bài tập thực hành</span>
+                            <div className="flex items-center gap-2 px-3.5 py-2 bg-blue-50 border border-blue-100 rounded-xl text-xs font-bold text-blue-700">
+                                <span>📚</span>
+                                <span>{totalExercises} bài tập thực hành</span>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Navigation Tabs */}
                     <div className="bg-white px-6 border-b border-slate-200 flex gap-6 rounded-t-2xl shrink-0">
@@ -152,10 +230,30 @@ export default function PracticeDetailPage({ params }: PageProps) {
                         </button>
                     </div>
 
-                    {/* Render Active Tab */}
-                    {activeTab === 'questions' && <QuestionsTab dbData={dbData} />}
-                    {activeTab === 'erd' && <ErdTab dbData={dbData} />}
-                    {activeTab === 'overview' && <OverviewTab dbData={dbData} />}
+                    {/* Tab Contents with Skeleton Handling */}
+                    {isLoading ? (
+                        <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-xs space-y-4 animate-pulse">
+                            <div className="h-6 bg-slate-200 rounded w-1/4" />
+                            <div className="h-4 bg-slate-100 rounded w-1/2" />
+                            <div className="space-y-3 pt-4">
+                                {[1, 2, 3, 4].map((i) => (
+                                    <div key={i} className="h-20 bg-slate-50 rounded-xl border border-slate-100" />
+                                ))}
+                            </div>
+                        </div>
+                    ) : dbDetail ? (
+                        <>
+                            {activeTab === 'questions' && (
+                                <QuestionsTab dbData={dbDetail} exercises={dbDetail.exercises} />
+                            )}
+                            {activeTab === 'erd' && (
+                                <ErdTab dbData={dbDetail} schemaData={dbDetail.schemaData} />
+                            )}
+                            {activeTab === 'overview' && (
+                                <OverviewTab dbData={dbDetail} schemaData={dbDetail.schemaData} />
+                            )}
+                        </>
+                    ) : null}
 
                     {/* Bottom Action Footer */}
                     <div className="bg-blue-50 border border-blue-200/70 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 mt-auto">

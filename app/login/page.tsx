@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import authService from '@/services/authService';
+import authService, { checkIsAdmin, extractRoleFromToken } from '@/services/authService';
+import userService from '@/services/userService';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -37,7 +38,33 @@ export default function LoginPage() {
                 return;
             }
 
-            router.push('/dashboard');
+            // Trích xuất role của tài khoản để điều hướng chính xác
+            let userRole: any =
+                res?.user?.role ||
+                res?.role ||
+                res?.roles ||
+                (res as any)?.data?.role ||
+                (res as any)?.result?.role;
+
+            if (!userRole && accessToken) {
+                userRole = extractRoleFromToken(accessToken);
+            }
+
+            if (!userRole) {
+                try {
+                    const profile = await userService.getCurrentUser(true);
+                    userRole = profile?.role;
+                } catch {
+                    // ignore
+                }
+            }
+
+            // Nếu tài khoản là Admin thì chuyển hướng ngay sang trang Quản trị, ngược lại vào trang Học viên
+            if (checkIsAdmin(userRole)) {
+                router.push('/admin/dashboard');
+            } else {
+                router.push('/dashboard');
+            }
         } catch (err: any) {
             console.error('Login error:', err);
             const data = err.response?.data;
