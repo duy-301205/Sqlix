@@ -11,7 +11,6 @@ import learningService, {
     LessonSection,
     LessonSummary,
 } from '@/services/learningService';
-import { SQL_COURSES, LESSONS_DATABASE } from './data';
 
 function LessonContent() {
     const searchParams = useSearchParams();
@@ -85,11 +84,17 @@ function LessonContent() {
     }, [fetchCurriculum]);
 
     // 2. Xác định slug của bài học cần tải
-    const currentSlug = lessonParam || (curriculum[0]?.lessons?.[0]?.slug || curriculum[0]?.lessons?.[0]?.id || 'select');
+    const firstLessonInCurriculum = curriculum.find((c) => c.lessons && c.lessons.length > 0)?.lessons?.[0];
+    const defaultSlug = firstLessonInCurriculum?.slug || firstLessonInCurriculum?.id || '';
+    const currentSlug = lessonParam || defaultSlug;
 
     // 3. Fetch Lesson Detail theo slug
     const fetchLessonDetail = useCallback(async (slug: string) => {
-        if (!slug) return;
+        if (!slug) {
+            setIsLoadingLesson(false);
+            setCurrentLesson(null);
+            return;
+        }
         setIsLoadingLesson(true);
         setLessonError(null);
 
@@ -105,15 +110,8 @@ function LessonContent() {
             }
         } catch (err: any) {
             console.error(`[Learning] Lỗi tải bài học slug="${slug}":`, err);
-            // Fallback sang LESSONS_DATABASE nếu có dữ liệu tương ứng
-            const fallbackLesson = (LESSONS_DATABASE as Record<string, any>)[slug] || LESSONS_DATABASE.select;
-            if (fallbackLesson) {
-                console.warn(`[Learning] Đã kích hoạt fallback data cho bài học "${slug}"`);
-                setCurrentLesson(fallbackLesson as any);
-                setOpenCategory(fallbackLesson.category || '');
-            } else {
-                setLessonError(err?.response?.data?.message || err?.message || 'Không thể tải nội dung bài học.');
-            }
+            setCurrentLesson(null);
+            setLessonError(err?.response?.data?.message || err?.message || 'Không thể tải nội dung bài học.');
         } finally {
             setIsLoadingLesson(false);
         }
@@ -122,8 +120,11 @@ function LessonContent() {
     useEffect(() => {
         if (currentSlug) {
             fetchLessonDetail(currentSlug);
+        } else if (!isLoadingCurriculum) {
+            setIsLoadingLesson(false);
+            setCurrentLesson(null);
         }
-    }, [currentSlug, fetchLessonDetail]);
+    }, [currentSlug, isLoadingCurriculum, fetchLessonDetail]);
 
     // Copy mã SQL vào Clipboard
     const handleCopy = (code: string, id: string) => {
@@ -341,6 +342,10 @@ function LessonContent() {
                         {[1, 2, 3, 4, 5].map((i) => (
                             <div key={i} className="h-8 bg-slate-100 animate-pulse rounded-lg" />
                         ))}
+                    </div>
+                ) : curriculum.length === 0 ? (
+                    <div className="px-3 py-8 text-center text-xs text-slate-400 leading-relaxed">
+                        Chưa có chuyên đề học tập nào.
                     </div>
                 ) : (
                     <div className="space-y-3">
@@ -618,7 +623,21 @@ function LessonContent() {
                             )}
                         </div>
                     </>
-                ) : null}
+                ) : (
+                    <div className="p-12 text-center bg-white rounded-3xl border border-slate-200/80 shadow-sm space-y-4 my-8">
+                        <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 mx-auto flex items-center justify-center text-2xl font-bold">
+                            📖
+                        </div>
+                        <h2 className="text-lg font-bold text-slate-800">
+                            {curriculum.length === 0 ? 'Chưa có bài học nào' : 'Vui lòng chọn bài học'}
+                        </h2>
+                        <p className="text-sm text-slate-500 max-w-md mx-auto">
+                            {curriculum.length === 0
+                                ? 'Hệ thống chưa có nội dung bài học. Hãy sử dụng API hoặc trang Quản trị viên để thêm chuyên đề và bài học mới.'
+                                : 'Hãy chọn một bài học từ danh sách lộ trình bên trái để bắt đầu học tập.'}
+                        </p>
+                    </div>
+                )}
             </main>
 
             {/* Right Floating TOC / Actions */}

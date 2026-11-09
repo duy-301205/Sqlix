@@ -18,7 +18,6 @@ export interface LessonAdminRequest {
     objectives: string[];
     practiceTopicCode: string;
     sortOrder: number;
-    difficulty?: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | string;
     isPublished?: boolean;
     [key: string]: any;
 }
