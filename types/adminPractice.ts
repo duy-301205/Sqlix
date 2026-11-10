@@ -6,9 +6,9 @@ export interface DatabaseRequest {
     name: string;
     slug: string;
     description: string;
-    difficulty: string;
+    difficulty: 'EASY' | 'MEDIUM' | 'HARD' | string;
     iconUrl: string;
-    schemaData: any;
+    schemaData: Record<string, any> | any;
     initSqlScript: string;
     tablesCount: number;
     exercisesCount: number;
@@ -20,17 +20,17 @@ export interface DatabaseRequest {
 export interface ExerciseRequest {
     title: string;
     description: string;
-    difficulty: string;
+    difficulty: 'EASY' | 'MEDIUM' | 'HARD' | string;
     topics: string;
     maxScore: number;
-    requirements: any;
-    expectedColumns: any;
+    requirements: string[] | any;
+    expectedColumns: string[] | any;
     solutionQuery: string;
     sortOrder: number;
     databaseId?: string;
     slug?: string;
     initialCodeSnippet?: string;
-    hints?: any;
+    hints?: string[] | any;
     [key: string]: any;
 }
 

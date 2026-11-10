@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import userService, { UserProfile as IServiceUserProfile, OccupationType } from '@/services/userService';
@@ -220,6 +221,45 @@ export default function ProfilePage() {
                         </div>
                     ) : (
                         <div className="space-y-6">
+                            {/* Banner Quản trị viên nếu tài khoản có quyền Admin */}
+                            {profile?.role === 'ADMIN' && (
+                                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+                                    <div className="flex items-center gap-3.5">
+                                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-lg shadow-sm shrink-0">
+                                            🛡️
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h4 className="text-xs sm:text-sm font-bold text-slate-900">
+                                                    Tài khoản Quản trị viên
+                                                </h4>
+                                                <span className="text-[10px] font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md">
+                                                    ADMIN
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                Bạn đang xem hồ sơ ở Cổng Học viên. Bạn có thể quay lại Bảng điều khiển Quản trị bất cứ lúc nào.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
+                                        <Link
+                                            href="/admin/profile"
+                                            className="flex-1 sm:flex-none text-center px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+                                        >
+                                            Hồ sơ Admin
+                                        </Link>
+                                        <Link
+                                            href="/admin/dashboard"
+                                            className="flex-1 sm:flex-none text-center px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5"
+                                        >
+                                            <span>Về Trang Quản Trị</span>
+                                            <span>🛡️</span>
+                                        </Link>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* ========================================================================= */}
                             {/* HERO PROFILE CARD: Ảnh đại diện, Tên, Badges, Nút Chỉnh sửa               */}
                             {/* ========================================================================= */}

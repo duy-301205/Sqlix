@@ -20,6 +20,15 @@ interface ToastState {
     type: 'success' | 'error';
 }
 
+// Helper: Chuẩn hóa mức độ khó enum DifficultyLevel (EASY, MEDIUM, HARD)
+const normalizeDifficulty = (raw?: string): 'EASY' | 'MEDIUM' | 'HARD' => {
+    if (!raw) return 'MEDIUM';
+    const upper = String(raw).toUpperCase().trim();
+    if (upper === 'EASY' || upper.includes('DỄ') || upper.includes('DE')) return 'EASY';
+    if (upper === 'HARD' || upper.includes('KHÓ') || upper.includes('KHO')) return 'HARD';
+    return 'MEDIUM';
+};
+
 // Chuẩn hóa Database trả về từ API backend
 const normalizeDatabase = (db: any, index: number): PracticeDatabase => {
     let schemaStr = '';
@@ -44,7 +53,7 @@ const normalizeDatabase = (db: any, index: number): PracticeDatabase => {
         createdAt: db.createdAt || new Date().toISOString(),
         updatedAt: db.updatedAt || new Date().toISOString(),
         exerciseCount: Number(db.exercisesCount ?? db.exerciseCount ?? (Array.isArray(db.exercises) ? db.exercises.length : 0)),
-        difficulty: db.difficulty || 'Trung bình',
+        difficulty: normalizeDifficulty(db.difficulty),
         iconUrl: db.iconUrl || '',
     };
 };
@@ -140,7 +149,7 @@ export default function AdminPracticePage() {
         name: '',
         slug: '',
         dialect: 'PostgreSQL' as 'PostgreSQL' | 'MySQL' | 'SQLite',
-        difficulty: 'Trung bình',
+        difficulty: 'MEDIUM' as 'EASY' | 'MEDIUM' | 'HARD',
         iconUrl: '',
         description: '',
         tableCount: 4,
@@ -265,7 +274,7 @@ export default function AdminPracticePage() {
                 name: db.name,
                 slug: db.slug,
                 dialect: db.dialect,
-                difficulty: db.difficulty || 'Trung bình',
+                difficulty: normalizeDifficulty(db.difficulty),
                 iconUrl: (db as any).iconUrl || '',
                 description: db.description,
                 tableCount: db.tableCount || 4,
@@ -279,7 +288,7 @@ export default function AdminPracticePage() {
                 name: '',
                 slug: '',
                 dialect: 'PostgreSQL',
-                difficulty: 'Trung bình',
+                difficulty: 'MEDIUM',
                 iconUrl: '',
                 description: '',
                 tableCount: 4,
@@ -320,12 +329,17 @@ export default function AdminPracticePage() {
             return;
         }
 
-        // Parse schemaData nếu hợp lệ
-        let parsedSchema: any = dbForm.schemaData;
+        // Parse schemaData: backend yêu cầu Map<String, Object> (JSON Object)
+        let parsedSchema: Record<string, any> = {};
         try {
             parsedSchema = JSON.parse(dbForm.schemaData);
+            if (typeof parsedSchema !== 'object' || parsedSchema === null || Array.isArray(parsedSchema)) {
+                showToast('Cấu trúc Schema JSON phải là một đối tượng JSON hợp lệ (ví dụ: { "tables": [...] })!', 'error');
+                return;
+            }
         } catch {
-            // để nguyên chuỗi nếu người dùng nhập dạng string
+            showToast('Chuỗi Schema JSON không đúng định dạng cú pháp JSON!', 'error');
+            return;
         }
 
         const generatedSlug =
@@ -337,18 +351,27 @@ export default function AdminPracticePage() {
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/(^-|-$)+/g, '');
 
+        // Kiểm tra trùng Slug trên danh sách Database hiện có
+        const isSlugDuplicated = databases.some(
+            (d) => d.slug === generatedSlug && (!editingTarget || d.id !== editingTarget.id)
+        );
+        if (isSlugDuplicated) {
+            showToast(`Đường dẫn tĩnh (Slug) "${generatedSlug}" đã tồn tại trong hệ thống. Vui lòng đổi Slug khác!`, 'error');
+            return;
+        }
+
         const payload: DatabaseRequest = {
             name: dbForm.name.trim(),
             slug: generatedSlug,
             description: dbForm.description.trim(),
-            difficulty: dbForm.difficulty,
+            difficulty: normalizeDifficulty(dbForm.difficulty),
             iconUrl: dbForm.iconUrl.trim(),
             schemaData: parsedSchema,
             initSqlScript: dbForm.initSqlScript.trim(),
-            tablesCount: Number(dbForm.tableCount),
-            exercisesCount: Number(editingTarget?.exerciseCount || 0),
+            tablesCount: Math.max(0, Number(dbForm.tableCount) || 0),
+            exercisesCount: Math.max(0, Number(editingTarget?.exerciseCount || editingTarget?.exercisesCount || 0)),
             dialect: dbForm.dialect,
-            sampleRecordsCount: Number(dbForm.sampleRecordsCount),
+            sampleRecordsCount: Math.max(0, Number(dbForm.sampleRecordsCount) || 0),
         };
 
         setIsSaving(true);
@@ -364,7 +387,11 @@ export default function AdminPracticePage() {
             await fetchDatabases();
         } catch (err: any) {
             console.error('[AdminPractice] Lỗi lưu Database:', err);
-            const msg = err.response?.data?.message || err.message || 'Lỗi khi lưu Database!';
+            const errorCode = err.response?.data?.code;
+            let msg = err.response?.data?.message || err.message || 'Lỗi khi lưu Database!';
+            if (errorCode === 1010) {
+                msg = `Đường dẫn tĩnh (Slug) "${payload.slug}" đã tồn tại trong hệ thống. Vui lòng nhập Slug khác hoặc chỉnh sửa Database hiện có!`;
+            }
             showToast(msg, 'error');
         } finally {
             setIsSaving(false);
@@ -434,22 +461,34 @@ export default function AdminPracticePage() {
             return;
         }
 
-        // Xử lý requirements (JSON hoặc string)
-        let parsedRequirements: any = exForm.requirements.trim();
+        // Xử lý requirements: backend yêu cầu List<String>
+        let parsedRequirements: string[] = [];
+        const rawReq = exForm.requirements.trim();
         try {
-            if (parsedRequirements.startsWith('[') || parsedRequirements.startsWith('{')) {
-                parsedRequirements = JSON.parse(parsedRequirements);
+            if (rawReq.startsWith('[')) {
+                const parsed = JSON.parse(rawReq);
+                if (Array.isArray(parsed)) {
+                    parsedRequirements = parsed.map(String);
+                }
+            } else {
+                parsedRequirements = rawReq.split('\n').map((r) => r.trim()).filter(Boolean);
             }
         } catch {
-            // giữ dạng string
+            parsedRequirements = [rawReq];
+        }
+        if (!parsedRequirements.length) {
+            parsedRequirements = [rawReq];
         }
 
-        // Xử lý expectedColumns (JSON mảng tên cột hoặc mảng chuỗi)
-        let parsedColumns: any = [];
+        // Xử lý expectedColumns: backend yêu cầu List<String>
+        let parsedColumns: string[] = [];
         try {
             const rawCol = exForm.expectedColumns.trim();
             if (rawCol.startsWith('[')) {
-                parsedColumns = JSON.parse(rawCol);
+                const parsed = JSON.parse(rawCol);
+                if (Array.isArray(parsed)) {
+                    parsedColumns = parsed.map(String);
+                }
             } else if (rawCol.length > 0) {
                 parsedColumns = rawCol.split(',').map((c) => c.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
             }
@@ -470,16 +509,25 @@ export default function AdminPracticePage() {
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/(^-|-$)+/g, '');
 
+        // Kiểm tra trùng Slug trong cùng Database
+        const isExSlugDuplicated = dbExercises.some(
+            (ex) => ex.slug === generatedSlug && (!editingTarget || ex.id !== editingTarget.id)
+        );
+        if (isExSlugDuplicated) {
+            showToast(`Đường dẫn tĩnh bài tập "${generatedSlug}" đã tồn tại trong Database này. Vui lòng đổi Slug!`, 'error');
+            return;
+        }
+
         const payload: ExerciseRequest = {
             title: exForm.title.trim(),
             description: exForm.description.trim() || exForm.requirements.trim(),
-            difficulty: exForm.difficulty,
+            difficulty: normalizeDifficulty(exForm.difficulty),
             topics: exForm.topics.trim() || 'SQL_QUERY',
-            maxScore: Number(exForm.points),
+            maxScore: Math.max(0, Number(exForm.points) || 20),
             requirements: parsedRequirements,
             expectedColumns: parsedColumns,
             solutionQuery: exForm.solutionQuery.trim(),
-            sortOrder: Number(exForm.orderIndex),
+            sortOrder: Math.max(0, Number(exForm.orderIndex) || 1),
             slug: generatedSlug,
             initialCodeSnippet: exForm.initialCodeSnippet,
             hints: hintsArray,
@@ -499,7 +547,11 @@ export default function AdminPracticePage() {
             await fetchDatabases();
         } catch (err: any) {
             console.error('[AdminPractice] Lỗi lưu Exercise:', err);
-            const msg = err.response?.data?.message || err.message || 'Lỗi khi lưu Bài tập!';
+            const errorCode = err.response?.data?.code;
+            let msg = err.response?.data?.message || err.message || 'Lỗi khi lưu Bài tập!';
+            if (errorCode === 1010) {
+                msg = `Dữ liệu bài tập hoặc Slug "${payload.slug}" đã tồn tại trong hệ thống. Vui lòng kiểm tra lại!`;
+            }
             showToast(msg, 'error');
         } finally {
             setIsSaving(false);
@@ -708,17 +760,28 @@ export default function AdminPracticePage() {
                                             className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs hover:shadow-md hover:border-blue-300 transition-all flex flex-col justify-between group"
                                         >
                                             <div>
-                                                {/* Dialect badge & Actions */}
+                                                {/* Dialect badge, Difficulty & Actions */}
                                                 <div className="flex items-center justify-between gap-2 mb-3">
-                                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                                        db.dialect === 'PostgreSQL'
-                                                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                                            : db.dialect === 'MySQL'
-                                                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                                            : 'bg-purple-50 text-purple-700 border border-purple-200'
-                                                    }`}>
-                                                        {db.dialect}
-                                                    </span>
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                                            db.dialect === 'PostgreSQL'
+                                                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                                : db.dialect === 'MySQL'
+                                                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                                : 'bg-purple-50 text-purple-700 border border-purple-200'
+                                                        }`}>
+                                                            {db.dialect}
+                                                        </span>
+                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                                            db.difficulty === 'EASY'
+                                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                                : db.difficulty === 'HARD'
+                                                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                        }`}>
+                                                            {db.difficulty === 'EASY' ? 'Dễ' : db.difficulty === 'HARD' ? 'Khó' : 'Trung bình'}
+                                                        </span>
+                                                    </div>
 
                                                     <div className="flex items-center gap-1">
                                                         <button
@@ -1069,12 +1132,12 @@ export default function AdminPracticePage() {
                                     <label className="block text-xs font-bold text-slate-700 mb-1">Mức độ khó</label>
                                     <select
                                         value={dbForm.difficulty}
-                                        onChange={(e) => setDbForm({ ...dbForm, difficulty: e.target.value })}
+                                        onChange={(e) => setDbForm({ ...dbForm, difficulty: e.target.value as 'EASY' | 'MEDIUM' | 'HARD' })}
                                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white"
                                     >
-                                        <option value="Dễ">Dễ</option>
-                                        <option value="Trung bình">Trung bình</option>
-                                        <option value="Khó">Khó</option>
+                                        <option value="EASY">EASY (Dễ)</option>
+                                        <option value="MEDIUM">MEDIUM (Trung bình)</option>
+                                        <option value="HARD">HARD (Khó)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -1387,7 +1450,10 @@ export default function AdminPracticePage() {
             {/* ========================================================================= */}
             {deleteTarget && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-                    <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+                    <div 
+                        style={{ maxWidth: '440px' }}
+                        className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150"
+                    >
                         <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -1400,7 +1466,10 @@ export default function AdminPracticePage() {
                             Bạn có chắc chắn muốn xóa <span className="font-bold text-slate-800">&quot;{deleteTarget.title}&quot;</span>?
                             {deleteTarget.type === 'DATABASE' && ' Toàn bộ bài tập và schema của cơ sở dữ liệu này sẽ bị xóa vĩnh viễn khỏi hệ thống.'}
                         </p>
-                        <div className="flex items-center justify-end gap-3">
+                        <div 
+                            style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}
+                            className="flex items-center justify-end gap-3"
+                        >
                             <button
                                 type="button"
                                 disabled={isSaving}
@@ -1413,6 +1482,7 @@ export default function AdminPracticePage() {
                                 type="button"
                                 disabled={isSaving}
                                 onClick={handleConfirmDelete}
+                                style={{ backgroundColor: '#e11d48', color: '#ffffff' }}
                                 className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white text-sm font-bold shadow-md shadow-rose-500/20 transition-all cursor-pointer flex items-center gap-1.5"
                             >
                                 {isSaving && (
