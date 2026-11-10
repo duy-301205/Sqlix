@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { DatabaseDetail, TableSchema, DATABASES_DETAIL } from '../data';
 
 interface ErdTabProps {
@@ -153,21 +153,115 @@ export default function ErdTab({ dbData, schemaData, compact = false, diagramOnl
         0
     );
 
-    const dbLayout = TABLE_LAYOUTS[currentDb.id] || TABLE_LAYOUTS.ecommerce;
+    const isPresetDb = Boolean(currentDb?.id && TABLE_LAYOUTS[currentDb.id]);
+    const dbLayout = isPresetDb ? TABLE_LAYOUTS[currentDb.id] : null;
 
     const getTableLayout = (table: TableSchema, index: number): TablePosition => {
-        if (dbLayout[table.name]) {
+        if (dbLayout && dbLayout[table.name]) {
             return dbLayout[table.name];
         }
-        const col = index % 3;
-        const row = Math.floor(index / 3);
+        // Tự động phân bổ lưới: nếu <= 4 bảng thì chia 2 cột, nếu nhiều hơn thì chia 3 cột
+        const numCols = tablesList.length <= 4 ? 2 : 3;
+        const col = index % numCols;
+        const row = Math.floor(index / numCols);
+        const colSpacing = numCols === 2 ? 340 : 255;
+        const rowSpacing = 260;
+
         return {
-            top: 15 + row * 255,
-            left: 15 + col * 240,
+            top: 20 + row * rowSpacing,
+            left: 20 + col * colSpacing,
             width: 220,
             colorScheme: COLOR_SCHEMES[index % COLOR_SCHEMES.length],
         };
     };
+
+    const canvasBounds = useMemo(() => {
+        let maxRight = 735;
+        let maxBottom = 480;
+
+        tablesList.forEach((t: any, idx: number) => {
+            const pos = getTableLayout(t, idx);
+            const w = pos.width || 220;
+            const h = 40 + (t.columns?.length || 4) * 26 + 10;
+            if (pos.left + w > maxRight) maxRight = pos.left + w + 30;
+            if (pos.top + h > maxBottom) maxBottom = pos.top + h + 30;
+        });
+
+        return { width: Math.max(735, maxRight), height: Math.max(480, maxBottom) };
+    }, [tablesList, dbLayout]);
+
+    // Trích xuất toàn bộ quan hệ (từ schemaData hoặc suy đoán từ cột có isFk)
+    interface ParsedRelation {
+        fromTable: string; // Bảng chứa khóa ngoại FK
+        fromCol: string;
+        toTable: string;   // Bảng chứa khóa chính PK
+        toCol: string;
+    }
+
+    const resolvedRelationships: ParsedRelation[] = useMemo(() => {
+        const rawRels =
+            schemaData?.relationships ||
+            schemaData?.relations ||
+            currentDb?.relationships ||
+            [];
+
+        const result: ParsedRelation[] = [];
+        const seen = new Set<string>();
+
+        const addRelation = (fromT: string, fromC: string, toT: string, toC: string) => {
+            if (!fromT || !toT) return;
+            const key = `${fromT}->${toT}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                result.push({ fromTable: fromT, fromCol: fromC, toTable: toT, toCol: toC || 'id' });
+            }
+        };
+
+        if (Array.isArray(rawRels)) {
+            for (const r of rawRels) {
+                if (typeof r === 'string') {
+                    const m = r.match(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)\s*->\s*([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)/);
+                    if (m) {
+                        addRelation(m[1], m[2], m[3], m[4]);
+                    }
+                } else if (r && typeof r === 'object') {
+                    if (r.relation && typeof r.relation === 'string') {
+                        const m = r.relation.match(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)\s*->\s*([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)/);
+                        if (m) {
+                            addRelation(m[1], m[2], m[3], m[4]);
+                        }
+                    }
+                    if (r.fromTable && r.toTable) {
+                        addRelation(r.fromTable, r.fromColumn || '', r.toTable, r.toColumn || 'id');
+                    }
+                }
+            }
+        }
+
+        // Bổ sung tự động suy đoán từ cột có isFk hoặc đuôi _id
+        for (const t of tablesList) {
+            const cols = t.columns || [];
+            for (const c of cols) {
+                if (c.isFk || (c.name.endsWith('_id') && c.name !== 'id')) {
+                    const stem = c.name.replace(/_id$/, '');
+                    const targetTable = tablesList.find(
+                        (other: any) =>
+                            other.name !== t.name &&
+                            (other.name.toLowerCase() === stem.toLowerCase() ||
+                             other.name.toLowerCase() === `${stem.toLowerCase()}s` ||
+                             other.name.toLowerCase() === `${stem.toLowerCase()}es` ||
+                             other.name.toLowerCase() === stem.toLowerCase().replace(/y$/, 'ies'))
+                    );
+
+                    if (targetTable) {
+                        addRelation(t.name, c.name, targetTable.name, 'id');
+                    }
+                }
+            }
+        }
+
+        return result;
+    }, [schemaData, currentDb, tablesList]);
 
     return (
         <div className={`flex ${diagramOnly ? 'w-full' : compact ? 'flex-col' : 'flex-col lg:flex-row'} items-start gap-6 pb-2 w-full`}>
@@ -281,8 +375,8 @@ export default function ErdTab({ dbData, schemaData, compact = false, diagramOnl
                 >
                     <div
                         style={{
-                            width: 735,
-                            height: 480,
+                            width: canvasBounds.width,
+                            height: canvasBounds.height,
                             transform: `scale(${zoomLevel / 100})`,
                             transformOrigin: 'center center',
                         }}
@@ -378,6 +472,125 @@ export default function ErdTab({ dbData, schemaData, compact = false, diagramOnl
                                     </g>
                                 </>
                             )}
+
+                            {/* CSDL TÙY BIẾN HOẶC TỰ ĐỘNG VẼ DÂY LIÊN KẾT */}
+                            {!isPresetDb &&
+                                resolvedRelationships.map((rel, rIdx) => {
+                                    const idxFrom = tablesList.findIndex((t: any) => t.name === rel.fromTable);
+                                    const idxTo = tablesList.findIndex((t: any) => t.name === rel.toTable);
+                                    if (idxFrom === -1 || idxTo === -1) return null;
+
+                                    const tableFK = tablesList[idxFrom];
+                                    const tablePK = tablesList[idxTo];
+                                    const posFK = getTableLayout(tableFK, idxFrom);
+                                    const posPK = getTableLayout(tablePK, idxTo);
+
+                                    const wFK = posFK.width || 220;
+                                    const hFK = 40 + (tableFK.columns?.length || 4) * 26;
+                                    const wPK = posPK.width || 220;
+                                    const hPK = 40 + (tablePK.columns?.length || 4) * 26;
+
+                                    const cxFK = posFK.left + wFK / 2;
+                                    const cyFK = posFK.top + hFK / 2;
+                                    const cxPK = posPK.left + wPK / 2;
+                                    const cyPK = posPK.top + hPK / 2;
+
+                                    const dx = cxFK - cxPK;
+                                    const dy = cyFK - cyPK;
+
+                                    const fkColIdx = tableFK.columns?.findIndex((c: any) => c.name === rel.fromCol || c.isFk) ?? -1;
+                                    const fkOffset = fkColIdx >= 0 ? 38 + fkColIdx * 26 + 13 : 38 + 13;
+                                    const pkOffset = 38 + 13;
+
+                                    let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+                                    let label1X = 0, label1Y = 0;
+                                    let labelNX = 0, labelNY = 0;
+                                    let fork1 = { x1: 0, y1: 0, x2: 0, y2: 0 };
+                                    let fork2 = { x1: 0, y1: 0, x2: 0, y2: 0 };
+                                    let dot = { cx: 0, cy: 0 };
+                                    let pathD = '';
+
+                                    if (Math.abs(dx) >= Math.abs(dy)) {
+                                        if (dx > 0) {
+                                            x1 = posPK.left + wPK;
+                                            y1 = posPK.top + pkOffset;
+                                            x2 = posFK.left;
+                                            y2 = posFK.top + fkOffset;
+                                            const midX = (x1 + x2) / 2;
+                                            pathD = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+
+                                            label1X = x1 + 6;
+                                            label1Y = y1 - 5;
+                                            labelNX = x2 - 14;
+                                            labelNY = y2 - 5;
+
+                                            fork1 = { x1: x2 - 7, y1: y2 - 6, x2: x2, y2: y2 };
+                                            fork2 = { x1: x2 - 7, y1: y2 + 6, x2: x2, y2: y2 };
+                                            dot = { cx: x1 + 3, cy: y1 };
+                                        } else {
+                                            x1 = posPK.left;
+                                            y1 = posPK.top + pkOffset;
+                                            x2 = posFK.left + wFK;
+                                            y2 = posFK.top + fkOffset;
+                                            const midX = (x1 + x2) / 2;
+                                            pathD = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+
+                                            label1X = x1 - 14;
+                                            label1Y = y1 - 5;
+                                            labelNX = x2 + 6;
+                                            labelNY = y2 - 5;
+
+                                            fork1 = { x1: x2 + 7, y1: y2 - 6, x2: x2, y2: y2 };
+                                            fork2 = { x1: x2 + 7, y1: y2 + 6, x2: x2, y2: y2 };
+                                            dot = { cx: x1 - 3, cy: y1 };
+                                        }
+                                    } else {
+                                        if (dy > 0) {
+                                            x1 = posPK.left + wPK / 2;
+                                            y1 = posPK.top + hPK;
+                                            x2 = posFK.left + wFK / 2;
+                                            y2 = posFK.top;
+                                            const midY = (y1 + y2) / 2;
+                                            pathD = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+
+                                            label1X = x1 + 6;
+                                            label1Y = y1 + 13;
+                                            labelNX = x2 + 6;
+                                            labelNY = y2 - 6;
+
+                                            fork1 = { x1: x2 - 6, y1: y2 - 7, x2: x2, y2: y2 };
+                                            fork2 = { x1: x2 + 6, y1: y2 - 7, x2: x2, y2: y2 };
+                                            dot = { cx: x1, cy: y1 + 3 };
+                                        } else {
+                                            x1 = posPK.left + wPK / 2;
+                                            y1 = posPK.top;
+                                            x2 = posFK.left + wFK / 2;
+                                            y2 = posFK.top + hFK;
+                                            const midY = (y1 + y2) / 2;
+                                            pathD = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+
+                                            label1X = x1 + 6;
+                                            label1Y = y1 - 6;
+                                            labelNX = x2 + 6;
+                                            labelNY = y2 + 13;
+
+                                            fork1 = { x1: x2 - 6, y1: y2 + 7, x2: x2, y2: y2 };
+                                            fork2 = { x1: x2 + 6, y1: y2 + 7, x2: x2, y2: y2 };
+                                            dot = { cx: x1, cy: y1 - 3 };
+                                        }
+                                    }
+
+                                    return (
+                                        <g key={`dynamic-rel-${rel.fromTable}-${rel.toTable}-${rIdx}`}>
+                                            <path d={pathD} fill="none" stroke="#64748b" strokeWidth="1.5" />
+                                            <text x={label1X} y={label1Y} fill="#475569" fontSize="10" fontWeight="bold">1</text>
+                                            <text x={labelNX} y={labelNY} fill="#475569" fontSize="10" fontWeight="bold">N</text>
+                                            <line x1={fork1.x1} y1={fork1.y1} x2={fork1.x2} y2={fork1.y2} stroke="#64748b" strokeWidth="1.5" />
+                                            <line x1={fork2.x1} y1={fork2.y1} x2={fork2.x2} y2={fork2.y2} stroke="#64748b" strokeWidth="1.5" />
+                                            <circle cx={dot.cx} cy={dot.cy} r="2.5" fill="white" stroke="#64748b" strokeWidth="1.5" />
+                                        </g>
+                                    );
+                                })}
                         </svg>
 
                         {/* ================= THẺ BẢNG ================= */}

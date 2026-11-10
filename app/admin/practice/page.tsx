@@ -29,27 +29,91 @@ const normalizeDifficulty = (raw?: string): 'EASY' | 'MEDIUM' | 'HARD' => {
     return 'MEDIUM';
 };
 
+const CACHE_PREFIX = 'sqlix_admin_db_meta_';
+
+const getCachedDb = (id?: string, slug?: string) => {
+    if (typeof window === 'undefined') return null;
+    try {
+        if (id) {
+            const raw = localStorage.getItem(CACHE_PREFIX + id);
+            if (raw) return JSON.parse(raw);
+        }
+        if (slug) {
+            const raw = localStorage.getItem(CACHE_PREFIX + slug);
+            if (raw) return JSON.parse(raw);
+        }
+    } catch {}
+    return null;
+};
+
+const saveCachedDb = (idOrSlug: string, data: any) => {
+    if (typeof window === 'undefined' || !idOrSlug) return;
+    try {
+        localStorage.setItem(CACHE_PREFIX + idOrSlug, JSON.stringify(data));
+    } catch {}
+};
+
 // Chuẩn hóa Database trả về từ API backend
 const normalizeDatabase = (db: any, index: number): PracticeDatabase => {
+    let rawSchemaObj: any = null;
     let schemaStr = '';
+
     if (typeof db.schemaData === 'string') {
         schemaStr = db.schemaData;
+        try {
+            rawSchemaObj = JSON.parse(db.schemaData);
+        } catch {}
     } else if (db.schemaData && typeof db.schemaData === 'object') {
+        rawSchemaObj = db.schemaData;
         schemaStr = JSON.stringify(db.schemaData, null, 2);
-    } else {
-        schemaStr = '{\n  "tables": ["users", "orders"],\n  "relationships": [\n    "orders.user_id -> users.id"\n  ]\n}';
     }
 
+    const dbId = String(db.id || db.databaseId || `db-${index + 1}`);
+    const dbSlug = db.slug || db.name?.toLowerCase().replace(/\s+/g, '-') || `database-${index + 1}`;
+    const cached = getCachedDb(dbId, dbSlug);
+
+    if (!schemaStr && cached?.schemaData) {
+        schemaStr = cached.schemaData;
+        try {
+            rawSchemaObj = JSON.parse(schemaStr);
+        } catch {}
+    }
+
+    const explicitRecords =
+        db.sampleRecordsCount !== undefined && db.sampleRecordsCount !== null && db.sampleRecordsCount !== 5000
+            ? Number(db.sampleRecordsCount)
+            : undefined;
+
+    const schemaRecords =
+        rawSchemaObj?.sampleRecordsCount !== undefined && rawSchemaObj.sampleRecordsCount !== null
+            ? Number(rawSchemaObj.sampleRecordsCount)
+            : (rawSchemaObj?._metadata?.sampleRecordsCount !== undefined
+                ? Number(rawSchemaObj._metadata.sampleRecordsCount)
+                : undefined);
+
+    const cachedRecords = cached?.sampleRecordsCount !== undefined ? Number(cached.sampleRecordsCount) : undefined;
+
+    const sampleRecordsCount = explicitRecords ?? schemaRecords ?? cachedRecords ?? 0;
+
+    const resolvedDialect =
+        db.dialect ||
+        rawSchemaObj?.dialect ||
+        rawSchemaObj?._metadata?.dialect ||
+        cached?.dialect ||
+        'PostgreSQL';
+
+    const resolvedInitScript = db.initSqlScript || cached?.initSqlScript || '';
+
     return {
-        id: String(db.id || db.databaseId || `db-${index + 1}`),
+        id: dbId,
         name: db.name || db.title || `Database ${index + 1}`,
-        slug: db.slug || db.name?.toLowerCase().replace(/\s+/g, '-') || `database-${index + 1}`,
+        slug: dbSlug,
         description: db.description || '',
-        dialect: (db.dialect || 'PostgreSQL') as 'PostgreSQL' | 'MySQL' | 'SQLite',
+        dialect: resolvedDialect as 'PostgreSQL' | 'MySQL' | 'SQLite',
         tableCount: Number(db.tablesCount ?? db.tableCount ?? (db.tables?.length || 4)),
-        sampleRecordsCount: Number(db.sampleRecordsCount ?? 5000),
+        sampleRecordsCount: sampleRecordsCount,
         schemaData: schemaStr,
-        initSqlScript: db.initSqlScript || '-- DDL Create tables & Insert sample data\nCREATE TABLE users (id SERIAL PRIMARY KEY, name VARCHAR(100));\nCREATE TABLE orders (id SERIAL PRIMARY KEY, user_id INT, total NUMERIC(10,2));',
+        initSqlScript: resolvedInitScript,
         createdAt: db.createdAt || new Date().toISOString(),
         updatedAt: db.updatedAt || new Date().toISOString(),
         exerciseCount: Number(db.exercisesCount ?? db.exerciseCount ?? (Array.isArray(db.exercises) ? db.exercises.length : 0)),
@@ -267,21 +331,58 @@ export default function AdminPracticePage() {
     }, [dbExercises, searchExQuery, difficultyFilter]);
 
     // ================= Database CRUD =================
-    const handleOpenDbModal = (db?: PracticeDatabase) => {
+    const handleOpenDbModal = async (db?: PracticeDatabase) => {
         if (db) {
             setEditingTarget(db);
+            const cached = getCachedDb(db.id, db.slug);
+            const initialSchema = db.schemaData || cached?.schemaData || '';
+            const initialScript = db.initSqlScript || cached?.initSqlScript || '';
+            const initialRecords = db.sampleRecordsCount ?? cached?.sampleRecordsCount ?? 0;
+            const initialDialect = db.dialect || cached?.dialect || 'PostgreSQL';
+
             setDbForm({
                 name: db.name,
                 slug: db.slug,
-                dialect: db.dialect,
+                dialect: initialDialect as any,
                 difficulty: normalizeDifficulty(db.difficulty),
                 iconUrl: (db as any).iconUrl || '',
                 description: db.description,
                 tableCount: db.tableCount || 4,
-                sampleRecordsCount: db.sampleRecordsCount || 5000,
-                schemaData: db.schemaData,
-                initSqlScript: db.initSqlScript,
+                sampleRecordsCount: initialRecords,
+                schemaData: initialSchema,
+                initSqlScript: initialScript,
             });
+            setActiveModal('DATABASE');
+
+            // Asynchronously fetch latest detail from backend to guarantee fresh initSqlScript and schemaData
+            try {
+                const detail = await adminPracticeService.getAdminDatabaseDetail(db.id || db.slug);
+                if (detail) {
+                    let schemaStr = '';
+                    if (typeof detail.schemaData === 'string') {
+                        schemaStr = detail.schemaData;
+                    } else if (detail.schemaData && typeof detail.schemaData === 'object') {
+                        schemaStr = JSON.stringify(detail.schemaData, null, 2);
+                    }
+
+                    const recs = detail.sampleRecordsCount ?? detail.schemaData?.sampleRecordsCount ?? detail.schemaData?._metadata?.sampleRecordsCount;
+                    const dia = detail.dialect || detail.schemaData?.dialect || detail.schemaData?._metadata?.dialect;
+
+                    setDbForm((prev) => ({
+                        ...prev,
+                        name: detail.name || prev.name,
+                        slug: detail.slug || prev.slug,
+                        description: detail.description ?? prev.description,
+                        dialect: (dia || prev.dialect) as any,
+                        tableCount: Number(detail.tablesCount ?? detail.tableCount ?? prev.tableCount),
+                        sampleRecordsCount: recs !== undefined && recs !== null ? Number(recs) : prev.sampleRecordsCount,
+                        schemaData: schemaStr || prev.schemaData,
+                        initSqlScript: detail.initSqlScript || prev.initSqlScript,
+                    }));
+                }
+            } catch (err) {
+                console.warn('[AdminPractice] Không thể tải chi tiết DB từ máy chủ:', err);
+            }
         } else {
             setEditingTarget(null);
             setDbForm({
@@ -292,12 +393,12 @@ export default function AdminPracticePage() {
                 iconUrl: '',
                 description: '',
                 tableCount: 4,
-                sampleRecordsCount: 5000,
+                sampleRecordsCount: 150,
                 schemaData: '{\n  "tables": [\n    {\n      "name": "users",\n      "columns": [\n        { "name": "id", "type": "SERIAL", "isPk": true },\n        { "name": "name", "type": "VARCHAR(100)" },\n        { "name": "email", "type": "VARCHAR(150)" }\n      ]\n    },\n    {\n      "name": "orders",\n      "columns": [\n        { "name": "id", "type": "SERIAL", "isPk": true },\n        { "name": "user_id", "type": "INT", "isFk": true },\n        { "name": "total", "type": "NUMERIC(10,2)" }\n      ]\n    }\n  ],\n  "relationships": [\n    {\n      "fromTable": "orders",\n      "toTable": "users",\n      "relation": "orders.user_id -> users.id",\n      "description": "Mỗi đơn hàng thuộc về một người dùng"\n    }\n  ]\n}',
                 initSqlScript: '-- DDL Create tables & Insert sample data\nCREATE TABLE users (\n    id SERIAL PRIMARY KEY,\n    name VARCHAR(100) NOT NULL,\n    email VARCHAR(150) UNIQUE NOT NULL\n);\n\nCREATE TABLE orders (\n    id SERIAL PRIMARY KEY,\n    user_id INT REFERENCES users(id),\n    total NUMERIC(10,2) NOT NULL DEFAULT 0\n);\n\n-- Sample rows\nINSERT INTO users (name, email) VALUES (\'Nguyễn Văn A\', \'a@gmail.com\'), (\'Trần Thị B\', \'b@gmail.com\');\nINSERT INTO orders (user_id, total) VALUES (1, 1500000), (2, 850000);',
             });
+            setActiveModal('DATABASE');
         }
-        setActiveModal('DATABASE');
     };
 
     // Helper: Định dạng JSON Schema tự động
@@ -360,18 +461,26 @@ export default function AdminPracticePage() {
             return;
         }
 
+        const recordsCount = Math.max(0, Number(dbForm.sampleRecordsCount) || 0);
+
+        const schemaWithMetadata = {
+            ...parsedSchema,
+            sampleRecordsCount: recordsCount,
+            dialect: dbForm.dialect,
+        };
+
         const payload: DatabaseRequest = {
             name: dbForm.name.trim(),
             slug: generatedSlug,
             description: dbForm.description.trim(),
             difficulty: normalizeDifficulty(dbForm.difficulty),
             iconUrl: dbForm.iconUrl.trim(),
-            schemaData: parsedSchema,
+            schemaData: schemaWithMetadata,
             initSqlScript: dbForm.initSqlScript.trim(),
             tablesCount: Math.max(0, Number(dbForm.tableCount) || 0),
             exercisesCount: Math.max(0, Number(editingTarget?.exerciseCount || editingTarget?.exercisesCount || 0)),
             dialect: dbForm.dialect,
-            sampleRecordsCount: Math.max(0, Number(dbForm.sampleRecordsCount) || 0),
+            sampleRecordsCount: recordsCount,
         };
 
         setIsSaving(true);
@@ -383,6 +492,23 @@ export default function AdminPracticePage() {
                 await adminPracticeService.createDatabase(payload);
                 showToast(`Tạo mới cơ sở dữ liệu "${payload.name}" thành công!`, 'success');
             }
+
+            // Cache immediately to ensure local state and instant access
+            saveCachedDb(generatedSlug, {
+                schemaData: dbForm.schemaData,
+                initSqlScript: payload.initSqlScript,
+                sampleRecordsCount: recordsCount,
+                dialect: payload.dialect,
+            });
+            if (editingTarget?.id) {
+                saveCachedDb(editingTarget.id, {
+                    schemaData: dbForm.schemaData,
+                    initSqlScript: payload.initSqlScript,
+                    sampleRecordsCount: recordsCount,
+                    dialect: payload.dialect,
+                });
+            }
+
             setActiveModal(null);
             await fetchDatabases();
         } catch (err: any) {

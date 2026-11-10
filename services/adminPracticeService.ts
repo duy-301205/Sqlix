@@ -33,19 +33,42 @@ export const adminPracticeService = {
 
     /**
      * Lấy danh sách toàn bộ Database cho khu vực quản trị
-     * Gọi GET /api/practice/databases
+     * Ưu tiên gọi GET /api/admin/practice/databases (đầy đủ schemaData và initSqlScript),
+     * fallback GET /api/practice/databases nếu cần.
      */
     getAdminDatabases: async (): Promise<AdminPracticeDatabase[]> => {
+        try {
+            const adminRes = await apiClient.get<any>('/api/admin/practice/databases');
+            const adminData = unwrapResponse<any>(adminRes.data);
+            if (Array.isArray(adminData)) {
+                return adminData;
+            }
+        } catch {
+            // Fallback sang endpoint catalog
+        }
+
         const response = await apiClient.get<any>('/api/practice/databases');
         const data = unwrapResponse<any>(response.data);
         return Array.isArray(data) ? data : [];
     },
 
     /**
-     * Lấy chi tiết một Database (kèm schemaData và danh sách exercises nếu có)
-     * Gọi GET /api/practice/databases/{id}
+     * Lấy chi tiết một Database (kèm schemaData, initSqlScript và danh sách exercises nếu có)
+     * Gọi GET /api/admin/practice/databases/{id} hoặc GET /api/practice/databases/{slug}
      */
     getAdminDatabaseDetail: async (dbIdOrSlug: string): Promise<any> => {
+        try {
+            const adminRes = await apiClient.get<any>(
+                `/api/admin/practice/databases/${encodeURIComponent(dbIdOrSlug)}`
+            );
+            const adminData = unwrapResponse<any>(adminRes.data);
+            if (adminData && typeof adminData === 'object') {
+                return adminData;
+            }
+        } catch {
+            // Fallback sang endpoint catalog chi tiết
+        }
+
         const response = await apiClient.get<any>(
             `/api/practice/databases/${encodeURIComponent(dbIdOrSlug)}`
         );
@@ -92,24 +115,33 @@ export const adminPracticeService = {
 
     /**
      * Lấy danh sách bài tập thuộc về một Database
-     * GET /api/practice/databases/{dbId}/exercises hoặc chi tiết database
+     * Ưu tiên gọi GET /api/admin/practice/databases/{dbId}/exercises
+     * Fallback sang /api/practice/databases/{dbId}/exercises hoặc chi tiết database
      */
     getAdminExercises: async (dbId: string): Promise<AdminPracticeExercise[]> => {
         try {
-            const response = await apiClient.get<any>(
-                `/api/practice/databases/${encodeURIComponent(dbId)}/exercises`
+            const adminRes = await apiClient.get<any>(
+                `/api/admin/practice/databases/${encodeURIComponent(dbId)}/exercises`
             );
-            const data = unwrapResponse<any>(response.data);
-            if (Array.isArray(data)) return data;
+            const adminData = unwrapResponse<any>(adminRes.data);
+            if (Array.isArray(adminData)) return adminData;
         } catch {
-            // Thử qua chi tiết database nếu endpoint trên không khả dụng
+            // Thử qua endpoint học viên hoặc chi tiết CSDL
             try {
-                const dbDetail = await adminPracticeService.getAdminDatabaseDetail(dbId);
-                if (dbDetail && Array.isArray(dbDetail.exercises)) {
-                    return dbDetail.exercises;
-                }
+                const response = await apiClient.get<any>(
+                    `/api/practice/databases/${encodeURIComponent(dbId)}/exercises`
+                );
+                const data = unwrapResponse<any>(response.data);
+                if (Array.isArray(data)) return data;
             } catch {
-                // ignore
+                try {
+                    const dbDetail = await adminPracticeService.getAdminDatabaseDetail(dbId);
+                    if (dbDetail && Array.isArray(dbDetail.exercises)) {
+                        return dbDetail.exercises;
+                    }
+                } catch {
+                    // ignore
+                }
             }
         }
 

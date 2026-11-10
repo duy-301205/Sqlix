@@ -51,20 +51,22 @@ export default function PracticeDetailPage({ params }: PageProps) {
         } catch (err: any) {
             console.error(`[Practice] Lỗi khi tải chi tiết CSDL slug="${dbSlug}":`, err);
 
-            // Fallback sang DATABASES_DETAIL mock data
-            const fallbackDetail = DATABASES_DETAIL[dbSlug] || DATABASES_DETAIL.ecommerce;
-            const fallbackExercises = DATABASE_EXERCISES[dbSlug] || DATABASE_EXERCISES.ecommerce || [];
+            // Fallback chỉ áp dụng nếu có mock data tương ứng với dbSlug, không ép sang ecommerce
+            const fallbackDetail = DATABASES_DETAIL[dbSlug];
+            const fallbackExercises = DATABASE_EXERCISES[dbSlug] || [];
 
-            console.warn(`[Practice] Sử dụng mock data dự phòng cho "${dbSlug}"`);
-            setDbDetail({
-                ...fallbackDetail,
-                slug: fallbackDetail.id,
-                exercises: fallbackExercises as any,
-                schemaData: {
-                    tables: fallbackDetail.tables,
-                    relationships: fallbackDetail.relationships,
-                },
-            } as any);
+            if (fallbackDetail) {
+                console.warn(`[Practice] Sử dụng mock data dự phòng cho "${dbSlug}"`);
+                setDbDetail({
+                    ...fallbackDetail,
+                    slug: fallbackDetail.id,
+                    exercises: fallbackExercises as any,
+                    schemaData: {
+                        tables: fallbackDetail.tables,
+                        relationships: fallbackDetail.relationships,
+                    },
+                } as any);
+            }
 
             setError(err?.response?.data?.message || err?.message || 'Không thể đồng bộ chi tiết CSDL từ máy chủ.');
         } finally {
@@ -89,10 +91,9 @@ export default function PracticeDetailPage({ params }: PageProps) {
         dbDetail?.description ||
         'Truy vấn và thực hành thao tác trên cơ sở dữ liệu mẫu.';
     const totalExercises =
-        dbDetail?.exercises?.length ||
-        dbDetail?.exercisesCount ||
-        DATABASE_EXERCISES[dbSlug]?.length ||
-        0;
+        dbDetail?.exercises !== undefined
+            ? dbDetail.exercises.length
+            : (dbDetail?.exercisesCount ?? (DATABASE_EXERCISES[dbSlug]?.length || 0));
 
     return (
         <div
