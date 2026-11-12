@@ -35,3 +35,18 @@ body {
   background-image: radial-gradient(#64748b 2px, transparent 2px);
   background-size: 24px 24px;
 }
+
+/* Fallback utilities to prevent dialog stretching or missing button colors in Turbopack/Tailwind v4 */
+.max-w-md {
+  max-width: 28rem;
+}
+.bg-rose-600 {
+  background-color: #e11d48;
+}
+.hover\:bg-rose-700:hover {
+  background-color: #be123c;
+}
+.justify-end {
+  justify-content: flex-end;
+}
+

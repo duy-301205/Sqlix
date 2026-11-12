@@ -23,7 +23,7 @@ export default function AdminDashboardPage() {
         setError(null);
 
         try {
-            const data = await adminDashboardService.getDashboardStats();
+            const data = await adminDashboardService.getDashboardStats(isRefresh);
             if (data && (data.totalUsers !== undefined || data.totalDatabases !== undefined)) {
                 setStats(data);
             } else {
@@ -207,21 +207,27 @@ export default function AdminDashboardPage() {
                             </div>
                             <div className="my-4">
                                 <div className="flex items-baseline gap-2">
-                                    <span className="text-3xl font-black text-slate-900">{stats.totalLessons}</span>
+                                    <span className="text-3xl font-black text-slate-900">{stats.totalLessons ?? 0}</span>
                                     <span className="text-sm font-semibold text-slate-500">
-                                        / {stats.totalCategories ?? 6} danh mục
+                                        bài học / {stats.totalCategories ?? 0} danh mục
                                     </span>
                                 </div>
                                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-3">
                                     <div
                                         className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                                        style={{ width: '84%' }}
+                                        style={{
+                                            width: `${
+                                                (stats.totalLessons ?? 0) > 0
+                                                    ? Math.min(100, Math.max(15, ((stats.totalLessons ?? 0) / Math.max(stats.totalLessons ?? 0, (stats.totalCategories || 1) * 3)) * 100))
+                                                    : 0
+                                            }%`,
+                                        }}
                                     />
                                 </div>
                             </div>
                             <div className="flex justify-between items-center text-xs">
                                 <span className="font-semibold text-emerald-600">
-                                    {stats.totalSections ?? 24} phần học chi tiết
+                                    {stats.totalSections ?? 0} phần học chi tiết
                                 </span>
                                 <span className="text-slate-400 font-medium">Đã xuất bản</span>
                             </div>

@@ -123,6 +123,13 @@ export const userService = {
     },
 
     /**
+     * Alias cho updateProfile
+     */
+    updateCurrentUser: (data: UpdateProfileData) => {
+        return userService.updateProfile(data);
+    },
+
+    /**
      * Xóa cache thông tin user (dùng khi đăng xuất)
      */
     clearCache: () => {

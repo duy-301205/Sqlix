@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import adminLearningService from '@/services/adminLearningService';
+import learningService from '@/services/learningService';
+import MarkdownRenderer from '@/app/components/MarkdownRenderer';
 import { LearningCategory, LessonItem, SectionItem } from '../types';
 
 type ModalType = 'CATEGORY' | 'LESSON' | 'SECTION' | null;
@@ -106,6 +108,7 @@ export default function AdminLearningPage() {
         sampleQuery: '',
         expectedResult: '',
     });
+    const [sectionMarkdownTab, setSectionMarkdownTab] = useState<'edit' | 'preview'>('edit');
 
     // Delete dialog
     const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -126,6 +129,61 @@ export default function AdminLearningPage() {
         }, 3500);
     }, []);
 
+    // Helper tải chi tiết đầy đủ của bài học (gồm sections, description, objectives) từ API
+    const enrichLessonsWithDetails = useCallback(async (categoriesToEnrich: LearningCategory[]) => {
+        const lessonsToFetch = categoriesToEnrich
+            .flatMap((c) => c.lessons)
+            .filter((l): l is LessonItem & { slug: string } => typeof l.slug === 'string' && l.slug.length > 0);
+        if (lessonsToFetch.length === 0) return;
+
+        try {
+            const results = await Promise.allSettled(
+                lessonsToFetch.map((les) => learningService.getLessonDetail(les.slug))
+            );
+
+            const detailMap = new Map<string, any>();
+            results.forEach((res, index) => {
+                if (res.status === 'fulfilled' && res.value) {
+                    detailMap.set(lessonsToFetch[index].id, res.value);
+                }
+            });
+
+            if (detailMap.size > 0) {
+                setCategories((prevCategories) =>
+                    prevCategories.map((cat) => ({
+                        ...cat,
+                        lessons: cat.lessons.map((les) => {
+                            const detail = detailMap.get(les.id);
+                            if (!detail) return les;
+
+                            const rawSections = Array.isArray(detail.sections) ? detail.sections : [];
+                            const sections: SectionItem[] = rawSections.map((sec: any, sIdx: number) => ({
+                                id: String(sec.id || sec.sectionId || `sec-${sIdx + 1}`),
+                                title: sec.title || `Phần học ${sIdx + 1}`,
+                                orderIndex: sec.orderIndex ?? sec.sortOrder ?? sIdx + 1,
+                                contentMarkdown: sec.contentMarkdown || sec.content || '',
+                                sampleQuery: sec.sampleQuery || sec.sampleSql || '',
+                                expectedResult: sec.expectedResult || '',
+                                durationMinutes: sec.durationMinutes ?? 15,
+                                noteBox: sec.noteBox || null,
+                            }));
+
+                            return {
+                                ...les,
+                                description: detail.description ?? les.description,
+                                objectives: Array.isArray(detail.objectives) ? detail.objectives : les.objectives,
+                                practiceTopicCode: detail.practiceTopicCode ?? les.practiceTopicCode,
+                                sections,
+                            };
+                        }),
+                    }))
+                );
+            }
+        } catch (enrichErr) {
+            console.warn('[AdminLearning] Không thể nạp chi tiết sections:', enrichErr);
+        }
+    }, []);
+
     // 1. Fetch Curriculum từ API
     const fetchCurriculum = useCallback(async () => {
         setIsLoading(true);
@@ -138,6 +196,8 @@ export default function AdminLearningPage() {
                     if (prev && normalized.some((c) => c.id === prev)) return prev;
                     return normalized[0]?.id || null;
                 });
+                // Tự động tải nạp chi tiết các phần học (sections) từ server
+                enrichLessonsWithDetails(normalized);
             } else {
                 setCategories([]);
                 setSelectedCategoryId(null);
@@ -149,7 +209,7 @@ export default function AdminLearningPage() {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [enrichLessonsWithDetails]);
 
     useEffect(() => {
         fetchCurriculum();
@@ -377,17 +437,19 @@ export default function AdminLearningPage() {
             });
         } else {
             setEditingTarget(null);
+            const targetLesson = categories.flatMap((c) => c.lessons).find((l) => l.id === targetLessonId);
             setSectionForm({
                 lessonId: targetLessonId,
                 title: '',
                 durationMinutes: 15,
-                orderIndex: 1,
+                orderIndex: (targetLesson?.sections?.length || 0) + 1,
                 contentMarkdown: '',
                 sampleQuery: '',
                 expectedResult: '',
             });
         }
         setActiveModal('SECTION');
+        setSectionMarkdownTab('edit');
     };
 
     const handleSaveSection = async (e: React.FormEvent) => {
@@ -410,6 +472,8 @@ export default function AdminLearningPage() {
             } else {
                 await adminLearningService.createSection(sectionForm.lessonId, payload);
                 showToast(`Đã tạo mới section "${sectionForm.title}" thành công!`, 'success');
+                // Tự động mở bài học vừa thêm section để người dùng thấy ngay
+                setExpandedLessons((prev) => ({ ...prev, [sectionForm.lessonId]: true }));
             }
             setActiveModal(null);
             await fetchCurriculum();
@@ -1190,16 +1254,53 @@ export default function AdminLearningPage() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                                        Nội dung lý thuyết (Markdown)
-                                    </label>
-                                    <textarea
-                                        rows={5}
-                                        value={sectionForm.contentMarkdown}
-                                        onChange={(e) => setSectionForm({ ...sectionForm, contentMarkdown: e.target.value })}
-                                        placeholder="Nhập nội dung bài giảng dưới định dạng Markdown..."
-                                        className="w-full font-mono text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                    />
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <label className="text-xs font-bold text-slate-700">
+                                            Nội dung lý thuyết (Markdown)
+                                        </label>
+                                        <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[11px] font-bold">
+                                            <button
+                                                type="button"
+                                                onClick={() => setSectionMarkdownTab('edit')}
+                                                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                                                    sectionMarkdownTab === 'edit'
+                                                        ? 'bg-white text-blue-600 shadow-2xs'
+                                                        : 'text-slate-500 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                Soạn thảo
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSectionMarkdownTab('preview')}
+                                                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                                                    sectionMarkdownTab === 'preview'
+                                                        ? 'bg-white text-blue-600 shadow-2xs'
+                                                        : 'text-slate-500 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                Xem trước (Preview)
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {sectionMarkdownTab === 'edit' ? (
+                                        <textarea
+                                            rows={6}
+                                            value={sectionForm.contentMarkdown}
+                                            onChange={(e) => setSectionForm({ ...sectionForm, contentMarkdown: e.target.value })}
+                                            placeholder="Nhập nội dung bài giảng dưới định dạng Markdown (### Tiêu đề, **in đậm**, *in nghiêng*, `code`, - gạch đầu dòng)..."
+                                            className="w-full font-mono text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed"
+                                        />
+                                    ) : (
+                                        <div className="min-h-[140px] max-h-[260px] overflow-y-auto px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                                            {sectionForm.contentMarkdown ? (
+                                                <MarkdownRenderer content={sectionForm.contentMarkdown} />
+                                            ) : (
+                                                <p className="text-xs text-slate-400 italic py-4 text-center">Chưa có nội dung để xem trước.</p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div>
@@ -1254,8 +1355,15 @@ export default function AdminLearningPage() {
 
             {/* ================= Delete Confirmation Dialog ================= */}
             {deleteTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-                    <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border-2 border-slate-300/80 animate-in zoom-in-95 duration-150">
+                <div 
+                    onClick={() => !isDeleting && setDeleteTarget(null)}
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+                >
+                    <div 
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ maxWidth: '440px' }}
+                        className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border-2 border-slate-300/80 animate-in zoom-in-95 duration-150"
+                    >
                         <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -1269,7 +1377,10 @@ export default function AdminLearningPage() {
                             {deleteTarget.type === 'CATEGORY' && ' Mọi bài học và section thuộc danh mục này cũng sẽ bị xóa bỏ vĩnh viễn.'}
                             {deleteTarget.type === 'LESSON' && ' Mọi section thuộc bài học này cũng sẽ bị xóa bỏ.'}
                         </p>
-                        <div className="flex items-center justify-end gap-3">
+                        <div 
+                            style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}
+                            className="flex items-center justify-end gap-3"
+                        >
                             <button
                                 type="button"
                                 disabled={isDeleting}
@@ -1282,7 +1393,8 @@ export default function AdminLearningPage() {
                                 type="button"
                                 disabled={isDeleting}
                                 onClick={handleConfirmDelete}
-                                className={`px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer flex items-center gap-1.5 ${
+                                style={{ backgroundColor: '#e11d48', color: '#ffffff' }}
+                                className={`px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold shadow-md shadow-rose-500/20 transition-all cursor-pointer flex items-center gap-1.5 ${
                                     isDeleting ? 'opacity-70 cursor-wait' : ''
                                 }`}
                             >
@@ -1292,7 +1404,12 @@ export default function AdminLearningPage() {
                                         <span>Đang xóa...</span>
                                     </>
                                 ) : (
-                                    <span>Xác nhận xóa</span>
+                                    <>
+                                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        <span>Xác nhận xóa</span>
+                                    </>
                                 )}
                             </button>
                         </div>

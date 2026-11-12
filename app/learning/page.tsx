@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
+import MarkdownRenderer from '@/app/components/MarkdownRenderer';
 import learningService, {
     CurriculumCategory,
     LessonDetail,
@@ -540,7 +541,8 @@ function LessonContent() {
                             {Array.isArray(currentLesson.sections) &&
                                 currentLesson.sections.map((sec: LessonSection) => {
                                     const sectionTitle = sec.title || sec.heading;
-                                    const sectionCode = sec.sampleSql || sec.code;
+                                    const sectionCode = sec.sampleSql || sec.code || sec.sampleQuery;
+                                    const sectionContent = sec.contentMarkdown || sec.content;
 
                                     return (
                                         <section key={sec.id} id={sec.id} className="space-y-3 scroll-mt-6">
@@ -549,10 +551,11 @@ function LessonContent() {
                                                     {sectionTitle}
                                                 </h3>
                                             )}
-                                            {sec.content && (
-                                                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">
-                                                    {sec.content}
-                                                </p>
+                                            {/* Theory Content (Render Markdown) */}
+                                            {sectionContent && (
+                                                <div className="text-slate-700 leading-relaxed">
+                                                    <MarkdownRenderer content={sectionContent} />
+                                                </div>
                                             )}
 
                                             {/* Code Block (Sample SQL) */}

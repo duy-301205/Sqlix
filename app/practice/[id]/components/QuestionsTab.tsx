@@ -28,11 +28,11 @@ export default function QuestionsTab({ dbData, exercises: propExercises }: Quest
 
     const dbKey = (dbData as any).slug || dbData.id || 'ecommerce';
 
-    // Ưu tiên bài tập từ props (API), fallback sang mock data
+    // Ưu tiên bài tập từ props (API). Nếu rỗng nghĩa là chưa có bài tập nào được tạo cho CSDL này.
     const rawExercises: (PracticeExercise | any)[] =
-        propExercises && propExercises.length > 0
+        Array.isArray(propExercises)
             ? propExercises
-            : DATABASE_EXERCISES[dbData.id] || DATABASE_EXERCISES.ecommerce || [];
+            : (DATABASE_EXERCISES[dbData.id] || (dbData as any).exercises || []);
 
     const filteredExercises = rawExercises.filter((ex) => {
         const diff = (ex.difficulty || '').toLowerCase();
@@ -172,8 +172,22 @@ export default function QuestionsTab({ dbData, exercises: propExercises }: Quest
                 })}
 
                 {filteredExercises.length === 0 && (
-                    <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-xs text-slate-400">
-                        Không tìm thấy bài tập phù hợp với bộ lọc hiện tại.
+                    <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-3">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                            </svg>
+                        </div>
+                        <p className="text-sm font-bold text-slate-700">
+                            {rawExercises.length === 0
+                                ? 'Chưa có bài tập truy vấn nào cho cơ sở dữ liệu này'
+                                : 'Không tìm thấy bài tập phù hợp với bộ lọc hiện tại'}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                            {rawExercises.length === 0
+                                ? 'Quản trị viên chưa tạo bài tập truy vấn cho cơ sở dữ liệu này hoặc bài tập đang được cập nhật.'
+                                : 'Hãy thử thay đổi từ khóa tìm kiếm hoặc chọn độ khó khác.'}
+                        </p>
                     </div>
                 )}
             </div>

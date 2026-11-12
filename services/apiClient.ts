@@ -7,7 +7,7 @@ export const apiClient = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 10000,
+    timeout: 60000,
 });
 
 // Quản lý trạng thái refresh token để tránh gọi nhiều lần đồng thời

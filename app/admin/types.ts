@@ -72,10 +72,13 @@ export interface LessonItem {
     id: string;
     categoryId: string;
     title: string;
+    slug?: string;
     description: string;
     orderIndex: number;
     difficulty?: string;
     isPublished: boolean;
+    objectives?: string[];
+    practiceTopicCode?: string;
     sections: SectionItem[];
 }
 
