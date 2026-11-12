@@ -33,9 +33,17 @@ export const adminMockTestService = {
 
     /**
      * Lấy danh sách toàn bộ đề thi thử cho quản trị viên
-     * Gọi GET /api/mock-tests
+     * Gọi GET /api/admin/mock-tests (ưu tiên) hoặc fallback /api/mock-tests
      */
     getAdminMockTests: async (): Promise<AdminMockTest[]> => {
+        try {
+            const adminRes = await apiClient.get<any>('/api/admin/mock-tests');
+            const adminData = unwrapResponse<any>(adminRes.data);
+            if (Array.isArray(adminData)) return adminData;
+        } catch {
+            // fallback
+        }
+
         try {
             const response = await apiClient.get<any>('/api/mock-tests', {
                 params: { page: 0, size: 100 },
@@ -101,8 +109,7 @@ export const adminMockTestService = {
 
     /**
      * Lấy danh sách câu hỏi thuộc về một đề thi
-     * Thử GET /api/admin/mock-tests/{testId}/questions trước,
-     * nếu không có thì lấy qua chi tiết đề thi hoặc workspace
+     * Gọi GET /api/admin/mock-tests/{testId}/questions
      */
     getAdminMockTestQuestions: async (testId: string): Promise<AdminMockQuestion[]> => {
         try {

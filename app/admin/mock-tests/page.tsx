@@ -22,8 +22,9 @@ interface ToastState {
 // Chuẩn hóa MockTest từ API Backend
 const normalizeMockTest = (item: any, index: number): MockTest => {
     let diff: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' = 'INTERMEDIATE';
-    if (item.difficulty === 'BEGINNER' || item.difficulty === 'Dễ') diff = 'BEGINNER';
-    else if (item.difficulty === 'ADVANCED' || item.difficulty === 'Khó') diff = 'ADVANCED';
+    const rawDiff = String(item.difficulty || '').toUpperCase();
+    if (rawDiff === 'BEGINNER' || rawDiff === 'EASY' || rawDiff === 'DỄ') diff = 'BEGINNER';
+    else if (rawDiff === 'ADVANCED' || rawDiff === 'HARD' || rawDiff === 'KHÓ') diff = 'ADVANCED';
 
     return {
         id: String(item.id || item.testId || `test-${index + 1}`),
@@ -371,16 +372,26 @@ export default function AdminMockTestsPage() {
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/(^-|-$)+/g, '');
 
+        const diffMap: Record<string, string> = {
+            BEGINNER: 'EASY',
+            EASY: 'EASY',
+            INTERMEDIATE: 'MEDIUM',
+            MEDIUM: 'MEDIUM',
+            ADVANCED: 'HARD',
+            HARD: 'HARD',
+        };
+        const backendDifficulty = diffMap[testForm.difficulty] || 'MEDIUM';
+
         const payload: MockTestRequest = {
             title: testForm.title.trim(),
             slug: generatedSlug,
             description: testForm.description.trim(),
-            difficulty: testForm.difficulty,
-            durationMinutes: Number(testForm.durationMinutes),
-            coverImageUrl: testForm.coverImageUrl.trim(),
-            passingScore: Number(testForm.passingScore),
-            maxScore: Number(testForm.maxScore),
-            isPublished: testForm.isPublished,
+            difficulty: backendDifficulty,
+            durationMinutes: Number(testForm.durationMinutes) || 30,
+            coverImageUrl: testForm.coverImageUrl?.trim() || '',
+            passingScore: Number(testForm.passingScore) || 7.0,
+            maxScore: Number(testForm.maxScore) || 10,
+            isPublished: Boolean(testForm.isPublished),
         };
 
         setIsSaving(true);
@@ -426,7 +437,7 @@ export default function AdminMockTestsPage() {
     const handleOpenQuestionModal = (question?: MockTestQuestion) => {
         if (!selectedTestId) return;
 
-        const defaultDbId = databases[0]?.id || 'db-1';
+        const defaultDbId = databases[0]?.id || '';
 
         if (question) {
             setEditingQuestion(question);
@@ -486,6 +497,10 @@ export default function AdminMockTestsPage() {
         }
 
         if (questionForm.type === 'SQL_QUERY') {
+            if (!questionForm.databaseId) {
+                showToast('Vui lòng chọn cơ sở dữ liệu mẫu liên kết cho câu hỏi SQL!', 'error');
+                return;
+            }
             if (!questionForm.solutionQuery.trim()) {
                 showToast('Vui lòng nhập câu truy vấn đáp án chuẩn SQL!', 'error');
                 return;
@@ -498,14 +513,17 @@ export default function AdminMockTestsPage() {
             }
         }
 
-        // Parse requirements
-        let parsedRequirements: any = questionForm.requirements.trim();
+        // Parse requirements into string array
+        let parsedRequirements: string[] = [];
         try {
-            if (parsedRequirements.startsWith('[') || parsedRequirements.startsWith('{')) {
-                parsedRequirements = JSON.parse(parsedRequirements);
+            const rawReq = questionForm.requirements.trim();
+            if (rawReq.startsWith('[')) {
+                parsedRequirements = JSON.parse(rawReq);
+            } else if (rawReq.length > 0) {
+                parsedRequirements = rawReq.split('\n').map((s) => s.trim()).filter(Boolean);
             }
         } catch {
-            // string
+            parsedRequirements = questionForm.requirements.trim() ? [questionForm.requirements.trim()] : [];
         }
 
         // Parse expectedColumns
@@ -532,7 +550,7 @@ export default function AdminMockTestsPage() {
             explanation: questionForm.explanation.trim(),
             ...(questionForm.type === 'SQL_QUERY'
                 ? {
-                      databaseId: questionForm.databaseId,
+                      databaseId: questionForm.databaseId || undefined,
                       requirements: parsedRequirements,
                       expectedColumns: parsedColumns,
                       solutionQuery: questionForm.solutionQuery.trim(),
