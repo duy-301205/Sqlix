@@ -42,51 +42,104 @@ export const mockTestService = {
     /**
      * Lấy danh sách các đề thi thử và phân trang
      * GET /api/mock-tests
-     * @param params - Các tham số lọc: difficulty (EASY, MEDIUM, HARD), page (mặc định 0), size (mặc định 10)...
+     * @param params - Các tham số lọc: difficulty (EASY, MEDIUM, HARD), page (UI 1-indexed), size...
      * @returns Danh sách đề thi MockTestPagination
      */
     getMockTests: async (params?: MockTestParams): Promise<MockTestPagination> => {
-        const queryParams = {
-            page: 0,
-            size: 10,
-            ...params,
+        // UI uses 1-based page (1, 2, 3...), Spring Data JPA uses 0-based page (0, 1, 2...)
+        const rawPage = params?.page !== undefined ? Number(params.page) : 1;
+        const zeroBasedPage = Math.max(0, rawPage > 0 ? rawPage - 1 : 0);
+
+        // Map Vietnamese/English difficulty to backend enum if provided
+        let backendDifficulty: string | undefined = undefined;
+        if (params?.difficulty && params.difficulty !== 'all') {
+            const d = params.difficulty.toUpperCase();
+            if (d.includes('DỄ') || d.includes('EASY') || d.includes('BEGINNER')) backendDifficulty = 'EASY';
+            else if (d.includes('KHÓ') || d.includes('HARD') || d.includes('ADVANCED') || d.includes('NÂNG CAO')) backendDifficulty = 'HARD';
+            else if (d.includes('TRUNG') || d.includes('MEDIUM') || d.includes('INTERMEDIATE')) backendDifficulty = 'MEDIUM';
+        }
+
+        const queryParams: Record<string, any> = {
+            page: zeroBasedPage,
+            size: params?.size || 10,
         };
+        if (params?.search) queryParams.search = params.search;
+        if (backendDifficulty) queryParams.difficulty = backendDifficulty;
 
         const response = await apiClient.get<any>('/api/mock-tests', { params: queryParams });
         const data = unwrapResponse<any>(response.data);
 
-        // Trường hợp backend trả về đối tượng phân trang chuẩn
-        if (data && typeof data === 'object' && !Array.isArray(data)) {
-            const rawItems = Array.isArray(data.items)
-                ? data.items
-                : Array.isArray(data.content)
-                ? data.content
-                : Array.isArray(data.tests)
-                ? data.tests
-                : [];
+        const paginationInfo = response.data?.pagination;
+        const rawList: any[] = Array.isArray(data)
+            ? data
+            : (data && Array.isArray(data.items))
+            ? data.items
+            : (data && Array.isArray(data.content))
+            ? data.content
+            : [];
 
-            const total = data.total ?? data.totalElements ?? rawItems.length;
-            const size = queryParams.size || data.size || data.pageSize || 10;
-            const page = queryParams.page !== undefined ? queryParams.page : (data.page || data.currentPage || 0);
-            const totalPages = data.totalPages ?? Math.max(1, Math.ceil(total / size));
-
-            return {
-                items: rawItems,
-                total,
-                page,
-                size,
-                totalPages,
-            };
+        // Read custom metadata (passingScore, maxScore, isPublished) from localStorage
+        let customMetaMap: Record<string, any> = {};
+        if (typeof window !== 'undefined') {
+            try {
+                const stored = localStorage.getItem('sqlix_mock_tests_custom_metadata');
+                if (stored) customMetaMap = JSON.parse(stored);
+            } catch {}
         }
 
-        // Trường hợp backend trả về trực tiếp một mảng
-        const list: MockTestSummary[] = Array.isArray(data) ? data : [];
+        const normalizedList: MockTestSummary[] = rawList
+            .map((item: any) => {
+                const id = String(item.id);
+                const slug = item.slug || id;
+                const meta = customMetaMap[id] || customMetaMap[slug] || {};
+
+                // Map difficulty to Vietnamese label
+                let diffLabel: 'Dễ' | 'Trung bình' | 'Khó' = 'Trung bình';
+                const rawDiff = String(item.difficulty || '').toUpperCase();
+                if (rawDiff === 'EASY' || rawDiff === 'DỄ' || rawDiff === 'BEGINNER') {
+                    diffLabel = 'Dễ';
+                } else if (rawDiff === 'HARD' || rawDiff === 'KHÓ' || rawDiff === 'ADVANCED') {
+                    diffLabel = 'Khó';
+                }
+
+                // Detect category from title / description
+                let category = item.category || 'SQL';
+                const text = ((item.title || '') + ' ' + (item.description || '')).toLowerCase();
+                if (text.includes('commerce') || text.includes('bán hàng') || text.includes('thương mại')) category = 'E-commerce';
+                else if (text.includes('university') || text.includes('đại học') || text.includes('giáo dục') || text.includes('trường')) category = 'University';
+                else if (text.includes('hospital') || text.includes('bệnh viện') || text.includes('y tế')) category = 'Hospital';
+                else if (text.includes('analytic') || text.includes('phân tích') || text.includes('thống kê')) category = 'Analytics';
+                else if (text.includes('bank') || text.includes('ngân hàng') || text.includes('tài chính')) category = 'Banking';
+
+                return {
+                    id,
+                    title: item.title || '',
+                    slug,
+                    description: item.description || '',
+                    difficulty: diffLabel,
+                    durationMinutes: Number(item.durationMinutes || 45),
+                    coverImageUrl: item.coverImageUrl || '',
+                    questionsCount: Number(item.totalQuestions ?? item.questionsCount ?? 0),
+                    participantsCount: Number(item.totalParticipants ?? item.participantsCount ?? 0),
+                    category,
+                    passingScore: item.passingScore ?? meta.passingScore ?? 7.0,
+                    maxScore: item.maxScore ?? meta.maxScore ?? 10,
+                    isPublished: item.isPublished !== undefined ? Boolean(item.isPublished) : (meta.isPublished !== undefined ? Boolean(meta.isPublished) : true),
+                };
+            })
+            // Filter out unpublished (draft) tests for students
+            .filter((item: MockTestSummary) => item.isPublished !== false);
+
+        const total = paginationInfo?.total ?? (data?.total || normalizedList.length);
+        const totalPages = paginationInfo?.last_page ?? Math.max(1, Math.ceil(total / (queryParams.size || 10)));
+        const page = paginationInfo?.current_page ?? rawPage;
+
         return {
-            items: list,
-            total: list.length,
-            page: queryParams.page || 0,
-            size: queryParams.size || list.length || 10,
-            totalPages: 1,
+            items: normalizedList,
+            total,
+            page,
+            size: queryParams.size,
+            totalPages,
         };
     },
 
@@ -99,7 +152,38 @@ export const mockTestService = {
     getMockTestDetail: async (slug: string): Promise<MockTestDetail> => {
         const response = await apiClient.get<any>(`/api/mock-tests/${encodeURIComponent(slug)}`);
         const data = unwrapResponse<any>(response.data);
-        return data as MockTestDetail;
+
+        let customMetaMap: Record<string, any> = {};
+        if (typeof window !== 'undefined') {
+            try {
+                const stored = localStorage.getItem('sqlix_mock_tests_custom_metadata');
+                if (stored) customMetaMap = JSON.parse(stored);
+            } catch {}
+        }
+
+        const id = String(data?.id || slug);
+        const itemSlug = data?.slug || slug;
+        const meta = customMetaMap[id] || customMetaMap[itemSlug] || {};
+
+        let diffLabel: 'Dễ' | 'Trung bình' | 'Khó' = 'Trung bình';
+        const rawDiff = String(data?.difficulty || '').toUpperCase();
+        if (rawDiff === 'EASY' || rawDiff === 'DỄ' || rawDiff === 'BEGINNER') {
+            diffLabel = 'Dễ';
+        } else if (rawDiff === 'HARD' || rawDiff === 'KHÓ' || rawDiff === 'ADVANCED') {
+            diffLabel = 'Khó';
+        }
+
+        return {
+            ...data,
+            id,
+            slug: itemSlug,
+            difficulty: diffLabel,
+            questionsCount: Number(data?.totalQuestions ?? data?.questionsCount ?? 0),
+            participantsCount: Number(data?.totalParticipants ?? data?.participantsCount ?? 0),
+            passingScore: data?.passingScore ?? meta.passingScore ?? 7.0,
+            maxScore: data?.maxScore ?? meta.maxScore ?? 10,
+            isPublished: data?.isPublished !== undefined ? Boolean(data?.isPublished) : (meta.isPublished !== undefined ? Boolean(meta.isPublished) : true),
+        };
     },
 
     /**

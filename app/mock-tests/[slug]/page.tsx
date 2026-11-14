@@ -91,8 +91,8 @@ export default function MockTestDetailPage({ params }: PageProps) {
     const difficulty = testDetail?.difficulty || testDetail?.level || 'Trung bình';
     const diffColor = testDetail?.difficultyColor || getDifficultyColor(difficulty);
     const category = testDetail?.category || testDetail?.categoryName || 'SQL Database';
-    const passingScore = testDetail?.passingScore || 80;
-    const totalScore = testDetail?.totalScore || 100;
+    const passingScore = testDetail?.passingScore ?? testDetail?.passScore ?? 7.0;
+    const totalScore = testDetail?.maxScore ?? testDetail?.totalScore ?? 10;
 
     return (
         <div
