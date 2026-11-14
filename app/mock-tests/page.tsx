@@ -154,16 +154,20 @@ export default function MockTestsListPage() {
                 const title = t.title || '';
                 const desc = t.description || '';
                 const matchSearch =
+                    !searchTerm.trim() ||
                     title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                     desc.toLowerCase().includes(searchTerm.toLowerCase());
 
                 const diff = (t.difficulty || '').toLowerCase();
                 const matchDiff =
-                    selectedDifficulty === 'all' || diff.includes(selectedDifficulty.toLowerCase());
+                    selectedDifficulty === 'all' ||
+                    diff.includes(selectedDifficulty.toLowerCase()) ||
+                    (selectedDifficulty === 'Nâng cao' && (diff === 'khó' || diff === 'hard' || diff === 'nâng cao'));
 
                 const cat = (t.category || '').toLowerCase();
                 const matchCat =
-                    selectedCategory === 'all' || cat.includes(selectedCategory.toLowerCase());
+                    selectedCategory === 'all' ||
+                    cat.includes(selectedCategory.toLowerCase());
 
                 return matchSearch && matchDiff && matchCat;
             })

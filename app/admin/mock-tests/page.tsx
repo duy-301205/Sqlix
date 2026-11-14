@@ -26,18 +26,44 @@ const normalizeMockTest = (item: any, index: number): MockTest => {
     if (rawDiff === 'BEGINNER' || rawDiff === 'EASY' || rawDiff === 'DỄ') diff = 'BEGINNER';
     else if (rawDiff === 'ADVANCED' || rawDiff === 'HARD' || rawDiff === 'KHÓ') diff = 'ADVANCED';
 
+    const id = String(item.id || item.testId || `test-${index + 1}`);
+    const slug = item.slug || item.title?.toLowerCase().replace(/\s+/g, '-') || `de-thi-${index + 1}`;
+
+    let meta: any = {};
+    if (typeof window !== 'undefined') {
+        try {
+            const stored = localStorage.getItem('sqlix_mock_tests_custom_metadata');
+            if (stored) {
+                const map = JSON.parse(stored);
+                meta = map[id] || map[slug] || {};
+            }
+        } catch {}
+    }
+
+    const passingScore = item.passingScore !== undefined && item.passingScore !== null
+        ? Number(item.passingScore)
+        : (meta.passingScore !== undefined ? Number(meta.passingScore) : Number(item.passScore ?? 7.0));
+
+    const maxScore = item.maxScore !== undefined && item.maxScore !== null
+        ? Number(item.maxScore)
+        : (meta.maxScore !== undefined ? Number(meta.maxScore) : Number(item.totalScore ?? 10));
+
+    const isPublished = item.isPublished !== undefined && item.isPublished !== null
+        ? Boolean(item.isPublished)
+        : (meta.isPublished !== undefined ? Boolean(meta.isPublished) : true);
+
     return {
-        id: String(item.id || item.testId || `test-${index + 1}`),
+        id,
         title: item.title || item.name || `Đề thi thử ${index + 1}`,
-        slug: item.slug || item.title?.toLowerCase().replace(/\s+/g, '-') || `de-thi-${index + 1}`,
+        slug,
         description: item.description || item.overview || '',
         durationMinutes: Number(item.durationMinutes || 45),
-        passingScore: Number(item.passingScore ?? item.passScore ?? 7.0),
-        maxScore: Number(item.maxScore ?? item.totalScore ?? 10),
-        isPublished: item.isPublished !== undefined ? Boolean(item.isPublished) : true,
+        passingScore,
+        maxScore,
+        isPublished,
         difficulty: diff,
         questionsCount: Number(
-            item.questionsCount ?? (Array.isArray(item.questions) ? item.questions.length : 0)
+            item.totalQuestions ?? item.questionsCount ?? (Array.isArray(item.questions) ? item.questions.length : 0)
         ),
         coverImageUrl: item.coverImageUrl || '',
         createdAt: item.createdAt || new Date().toISOString(),
@@ -394,15 +420,43 @@ export default function AdminMockTestsPage() {
             isPublished: Boolean(testForm.isPublished),
         };
 
+        const passingScore = Number(testForm.passingScore) || 7.0;
+        const maxScore = Number(testForm.maxScore) || 10;
+        const isPublished = Boolean(testForm.isPublished);
+
+        // Pre-save metadata to localStorage
+        try {
+            const stored = localStorage.getItem('sqlix_mock_tests_custom_metadata');
+            const map = stored ? JSON.parse(stored) : {};
+            const key = editingTest ? editingTest.id : generatedSlug;
+            map[key] = { passingScore, maxScore, isPublished };
+            if (generatedSlug) map[generatedSlug] = { passingScore, maxScore, isPublished };
+            localStorage.setItem('sqlix_mock_tests_custom_metadata', JSON.stringify(map));
+        } catch {}
+
         setIsSaving(true);
         try {
+            let savedId = editingTest ? editingTest.id : '';
             if (editingTest) {
                 await adminMockTestService.updateMockTest(editingTest.id, payload);
                 showToast(`Cập nhật đề thi "${payload.title}" thành công!`, 'success');
             } else {
-                await adminMockTestService.createMockTest(payload);
+                const res = await adminMockTestService.createMockTest(payload);
+                savedId = res?.id || res?.result || (typeof res === 'string' ? res : '');
                 showToast(`Tạo đề thi mới "${payload.title}" thành công!`, 'success');
             }
+
+            // Also associate the newly generated UUID with the metadata
+            if (savedId) {
+                try {
+                    const stored = localStorage.getItem('sqlix_mock_tests_custom_metadata');
+                    const map = stored ? JSON.parse(stored) : {};
+                    map[savedId] = { passingScore, maxScore, isPublished };
+                    if (generatedSlug) map[generatedSlug] = { passingScore, maxScore, isPublished };
+                    localStorage.setItem('sqlix_mock_tests_custom_metadata', JSON.stringify(map));
+                } catch {}
+            }
+
             setActiveModal(null);
             await fetchMockTests();
         } catch (err: any) {
@@ -416,6 +470,14 @@ export default function AdminMockTestsPage() {
 
     const handleTogglePublish = async (test: MockTest) => {
         const updatedStatus = !test.isPublished;
+        try {
+            const stored = localStorage.getItem('sqlix_mock_tests_custom_metadata');
+            const map = stored ? JSON.parse(stored) : {};
+            map[test.id] = { ...(map[test.id] || {}), isPublished: updatedStatus };
+            if (test.slug) map[test.slug] = { ...(map[test.slug] || {}), isPublished: updatedStatus };
+            localStorage.setItem('sqlix_mock_tests_custom_metadata', JSON.stringify(map));
+        } catch {}
+
         try {
             await adminMockTestService.updateMockTest(test.id, {
                 isPublished: updatedStatus,

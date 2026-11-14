@@ -172,20 +172,40 @@ export const historyService = {
             ? data.questionsReview
             : [];
 
-        const questions = rawQuestions.map((q: any) => ({
-            questionId: q.questionId || q.id || '',
-            questionText: q.questionText || q.content || q.question || '',
-            type: q.type || q.questionType || 'sql_query',
-            points: q.points ?? 0,
-            maxPoints: q.maxPoints ?? q.points ?? 20,
-            isCorrect: q.isCorrect ?? q.correct ?? false,
-            userAnswer: q.userAnswer ?? q.submittedAnswer ?? '',
-            solutionAnswer: q.solutionAnswer ?? q.correctAnswer ?? q.solutionQuery ?? '',
-            explanation: q.explanation || '',
-            ...q,
-        }));
+        const questions = rawQuestions.map((q: any) => {
+            const correctAnswerVal =
+                q.correctAnswer ||
+                q.mcCorrectOption ||
+                q.solutionQuery ||
+                q.solutionAnswer ||
+                '';
+            const earnedPoints = q.score !== undefined ? q.score : (q.points ?? 0);
+            const totalPoints = q.maxScore !== undefined ? q.maxScore : (q.maxPoints ?? q.points ?? 20);
+
+            return {
+                ...q,
+                questionId: q.questionId || q.id || '',
+                questionText: q.content || q.questionText || q.question || '',
+                content: q.content || q.questionText || q.question || '',
+                type: q.questionType || q.type || 'sql_query',
+                questionType: q.questionType || q.type || 'sql_query',
+                points: earnedPoints,
+                score: earnedPoints,
+                maxPoints: totalPoints,
+                maxScore: totalPoints,
+                isCorrect: q.isCorrect ?? q.correct ?? false,
+                userAnswer: q.submittedAnswer ?? q.userAnswer ?? '',
+                submittedAnswer: q.submittedAnswer ?? q.userAnswer ?? '',
+                correctAnswer: correctAnswerVal,
+                solutionAnswer: correctAnswerVal,
+                solutionQuery: q.solutionQuery || (q.questionType !== 'MULTIPLE_CHOICE' ? correctAnswerVal : ''),
+                mcCorrectOption: q.mcCorrectOption || (q.questionType === 'MULTIPLE_CHOICE' ? correctAnswerVal : ''),
+                explanation: q.explanation || '',
+            };
+        });
 
         return {
+            ...data,
             sessionId: data?.sessionId || data?.id || sessionId,
             testId: data?.testId || data?.mockTestId || 'mock-1',
             testTitle: data?.testTitle || data?.title || 'Đề thi SQL',
@@ -197,13 +217,12 @@ export const historyService = {
             durationSeconds: data?.durationSeconds ?? data?.timeSpentSeconds ?? 0,
             timeSpentSeconds: data?.timeSpentSeconds ?? data?.durationSeconds ?? 0,
             durationMinutes: data?.durationMinutes ?? 20,
-            correctCount: data?.correctCount ?? data?.correctAnswers ?? 0,
-            correctAnswers: data?.correctAnswers ?? data?.correctCount ?? 0,
+            correctCount: data?.correctCount ?? data?.correctAnswers ?? questions.filter((q: any) => q.isCorrect).length,
+            correctAnswers: data?.correctAnswers ?? data?.correctCount ?? questions.filter((q: any) => q.isCorrect).length,
             totalQuestions: data?.totalQuestions ?? questions.length ?? 5,
             status: data?.status || (data?.score >= 60 ? 'PASSED' : 'FAILED'),
             questions,
             questionsReview: questions,
-            ...data,
         };
     },
 
