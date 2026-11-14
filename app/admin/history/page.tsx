@@ -15,8 +15,27 @@ interface ToastState {
 }
 
 // Chuẩn hóa một bản ghi phiên thi từ Backend hoặc Mock
-const normalizeHistoryItem = (item: any, index: number): AdminHistoryItem => {
-    const rawPassed = item.isPassed !== undefined ? Boolean(item.isPassed) : (Number(item.score || 0) >= 7.0);
+const normalizeHistoryItem = (
+    item: any,
+    index: number,
+    matchedTest?: { maxScore?: number; totalQuestions?: number }
+): AdminHistoryItem => {
+    const rawScore = Number(item.score ?? 0);
+    const calculatedMaxScore = Number(
+        item.maxScore ??
+        matchedTest?.maxScore ??
+        (rawScore > 10 ? 100 : 100)
+    );
+    const calculatedTotalQuestions = Number(
+        item.totalQuestionsCount ??
+        item.totalQuestions ??
+        matchedTest?.totalQuestions ??
+        10
+    );
+    const rawPassed =
+        item.isPassed !== undefined
+            ? Boolean(item.isPassed)
+            : rawScore >= calculatedMaxScore * 0.6;
 
     return {
         id: String(item.id || item.sessionId || `sess-${index + 1}`),
@@ -31,14 +50,14 @@ const normalizeHistoryItem = (item: any, index: number): AdminHistoryItem => {
         userEmail: item.userEmail || item.email || `${item.username || 'user'}@gmail.com`,
         mockTestId: item.mockTestId || item.testId || 'test-1',
         testTitle: item.testTitle || item.mockTestTitle || 'Đề thi thử SQL',
-        score: Number(item.score ?? 0),
-        maxScore: Number(item.maxScore ?? 10),
+        score: rawScore,
+        maxScore: calculatedMaxScore,
         isPassed: rawPassed,
         status: item.status || 'COMPLETED',
         durationSeconds: Number(item.durationSeconds ?? 1800),
         correctAnswersCount: Number(item.correctAnswersCount ?? item.correctCount ?? 8),
-        totalQuestions: Number(item.totalQuestions ?? item.totalQuestionsCount ?? 10),
-        totalQuestionsCount: Number(item.totalQuestionsCount ?? item.totalQuestions ?? 10),
+        totalQuestions: calculatedTotalQuestions,
+        totalQuestionsCount: calculatedTotalQuestions,
         startedAt: item.startedAt || new Date(Date.now() - 3600000).toISOString(),
         submittedAt: item.submittedAt || new Date().toISOString(),
     };
@@ -48,6 +67,7 @@ export default function AdminHistoryPage() {
     // ================= State Management =================
     const [histories, setHistories] = useState<AdminHistoryItem[]>([]);
     const [mockTestsList, setMockTestsList] = useState<{ id: string; title: string }[]>([]);
+    const testsMapRef = useRef<Map<string, { maxScore?: number; totalQuestions?: number }>>(new Map());
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
@@ -95,6 +115,16 @@ export default function AdminHistoryPage() {
             const rawTests = await adminMockTestService.getAdminMockTests();
             if (Array.isArray(rawTests)) {
                 setMockTestsList(rawTests.map((t) => ({ id: t.id, title: t.title })));
+                const map = new Map<string, { maxScore?: number; totalQuestions?: number }>();
+                rawTests.forEach((t) => {
+                    const info = {
+                        maxScore: Number(t.maxScore || 100),
+                        totalQuestions: Number(t.totalQuestions || 10),
+                    };
+                    if (t.id) map.set(t.id, info);
+                    if (t.title) map.set(t.title.trim().toLowerCase(), info);
+                });
+                testsMapRef.current = map;
             } else {
                 setMockTestsList([]);
             }
@@ -133,7 +163,15 @@ export default function AdminHistoryPage() {
             const res = await adminHistoryService.getAllHistories(params);
 
             if (res && Array.isArray(res.items)) {
-                const normalized = res.items.map((item, idx) => normalizeHistoryItem(item, idx));
+                const map = testsMapRef.current;
+                const normalized = res.items.map((item, idx) => {
+                    const titleKey = (item.testTitle || '')?.trim()?.toLowerCase();
+                    const matchedTest =
+                        (item.mockTestId ? map.get(item.mockTestId) : undefined) ||
+                        (item.testId ? map.get(item.testId) : undefined) ||
+                        (titleKey ? map.get(titleKey) : undefined);
+                    return normalizeHistoryItem(item, idx, matchedTest);
+                });
                 setHistories(normalized);
                 setPagination(res.pagination);
             } else {
@@ -327,7 +365,9 @@ export default function AdminHistoryPage() {
                         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
                             Điểm Trung Bình
                         </span>
-                        <span className="text-2xl font-black text-indigo-600">{averageScore} / 10</span>
+                        <span className="text-2xl font-black text-indigo-600">
+                            {averageScore} / {histories[0]?.maxScore || 100}
+                        </span>
                         <span className="text-xs text-slate-400 block mt-0.5">toàn bộ học viên</span>
                     </div>
                     <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg">
@@ -487,14 +527,14 @@ export default function AdminHistoryPage() {
                         <input
                             type="number"
                             min="0"
-                            max="10"
-                            step="0.5"
+                            max="100"
+                            step="1"
                             value={minScore}
                             onChange={(e) => {
                                 setMinScore(e.target.value);
                                 setPage(0);
                             }}
-                            placeholder="0.0"
+                            placeholder="0"
                             className="w-full px-3 py-2 rounded-xl border border-slate-200/80 text-xs bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                         />
                     </div>
@@ -508,13 +548,13 @@ export default function AdminHistoryPage() {
                             type="number"
                             min="0"
                             max="100"
-                            step="0.5"
+                            step="1"
                             value={maxScore}
                             onChange={(e) => {
                                 setMaxScore(e.target.value);
                                 setPage(0);
                             }}
-                            placeholder="10.0"
+                            placeholder="100"
                             className="w-full px-3 py-2 rounded-xl border border-slate-200/80 text-xs bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                         />
                     </div>
@@ -610,7 +650,7 @@ export default function AdminHistoryPage() {
                                                 }`}>
                                                     {s.score}
                                                 </span>
-                                                <span className="text-xs text-slate-400">/ {s.maxScore || 10}</span>
+                                                <span className="text-xs text-slate-400">/ {s.maxScore || 100}</span>
                                             </div>
                                         </td>
 
@@ -818,7 +858,7 @@ export default function AdminHistoryPage() {
                                     <span className={`text-2xl font-black mt-1 block ${
                                         viewingSession.isPassed ? 'text-emerald-600' : 'text-rose-600'
                                     }`}>
-                                        {viewingSession.score} / {viewingSession.maxScore || 10}
+                                        {viewingSession.score} / {viewingSession.maxScore || 100}
                                     </span>
                                 </div>
 
@@ -827,7 +867,7 @@ export default function AdminHistoryPage() {
                                         Số Câu Đúng
                                     </span>
                                     <span className="text-2xl font-black text-slate-900 mt-1 block">
-                                        {viewingSession.correctAnswersCount ?? 0} / {viewingSession.totalQuestionsCount ?? 10}
+                                        {viewingSession.correctAnswersCount ?? 0} / {viewingSession.totalQuestionsCount ?? viewingSession.totalQuestions ?? 10}
                                     </span>
                                 </div>
 

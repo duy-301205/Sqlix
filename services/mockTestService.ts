@@ -9,6 +9,7 @@ import {
     TestWorkspaceResponse,
     SubmitAnswerResponse,
     SubmitTestResponse,
+    TestResultResponse,
 } from '@/types/mockTest';
 
 export type {
@@ -21,6 +22,7 @@ export type {
     TestWorkspaceResponse,
     SubmitAnswerResponse,
     SubmitTestResponse,
+    TestResultResponse,
 };
 
 /**
@@ -122,8 +124,8 @@ export const mockTestService = {
                     questionsCount: Number(item.totalQuestions ?? item.questionsCount ?? 0),
                     participantsCount: Number(item.totalParticipants ?? item.participantsCount ?? 0),
                     category,
-                    passingScore: item.passingScore ?? meta.passingScore ?? 7.0,
-                    maxScore: item.maxScore ?? meta.maxScore ?? 10,
+                    passingScore: item.passingScore ?? meta.passingScore ?? 60,
+                    maxScore: item.maxScore ?? meta.maxScore ?? 100,
                     isPublished: item.isPublished !== undefined ? Boolean(item.isPublished) : (meta.isPublished !== undefined ? Boolean(meta.isPublished) : true),
                 };
             })
@@ -180,8 +182,8 @@ export const mockTestService = {
             difficulty: diffLabel,
             questionsCount: Number(data?.totalQuestions ?? data?.questionsCount ?? 0),
             participantsCount: Number(data?.totalParticipants ?? data?.participantsCount ?? 0),
-            passingScore: data?.passingScore ?? meta.passingScore ?? 7.0,
-            maxScore: data?.maxScore ?? meta.maxScore ?? 10,
+            passingScore: data?.passingScore ?? meta.passingScore ?? 60,
+            maxScore: data?.maxScore ?? meta.maxScore ?? 100,
             isPublished: data?.isPublished !== undefined ? Boolean(data?.isPublished) : (meta.isPublished !== undefined ? Boolean(meta.isPublished) : true),
         };
     },
@@ -218,19 +220,39 @@ export const mockTestService = {
         const response = await apiClient.get<any>(`/api/test-sessions/${encodeURIComponent(sessionId)}/workspace`);
         const data = unwrapResponse<any>(response.data);
 
-        const rawQuestions: WorkspaceQuestion[] = Array.isArray(data?.questions)
+        const rawQuestions: any[] = Array.isArray(data?.questions)
             ? data.questions
             : Array.isArray(data?.questionList)
             ? data.questionList
             : [];
 
+        const normalizedQuestions: WorkspaceQuestion[] = rawQuestions.map((q: any, idx: number) => {
+            const qId = String(q.id || q.questionId || `q-${idx + 1}`);
+            return {
+                ...q,
+                id: qId,
+                questionId: qId,
+                content: q.content || q.title || '',
+                title: q.title || `Câu hỏi số ${idx + 1}`,
+                points: Number(q.points ?? 10),
+                sortOrder: Number(q.sortOrder ?? idx + 1),
+                questionType: q.questionType || 'SQL_QUERY',
+                databaseId: q.databaseId ? String(q.databaseId) : undefined,
+                schemaData: q.schemaData || undefined,
+                requirements: q.requirements || [],
+                expectedColumns: q.expectedColumns || [],
+                mcOptions: q.mcOptions || [],
+            };
+        });
+
         return {
             ...data,
             id: data?.id || data?.sessionId || sessionId,
             sessionId: data?.sessionId || data?.id || sessionId,
+            testTitle: data?.testTitle || data?.title || 'Phòng thi thử SQL mô phỏng',
             startTime: data?.startTime || data?.startedAt || new Date().toISOString(),
             durationMinutes: data?.durationMinutes ?? data?.duration ?? 45,
-            questions: rawQuestions,
+            questions: normalizedQuestions,
         };
     },
 
@@ -288,6 +310,45 @@ export const mockTestService = {
             message: data?.message,
             details: data?.details || [],
             ...data,
+        };
+    },
+
+    /**
+     * Lấy kết quả chấm điểm chi tiết của phiên thi
+     * GET /api/test-sessions/{sessionId}/result
+     * @param sessionId - Mã phiên thi
+     * @returns TestResultResponse
+     */
+    getTestResult: async (sessionId: string): Promise<TestResultResponse> => {
+        const response = await apiClient.get<any>(
+            `/api/test-sessions/${encodeURIComponent(sessionId)}/result`
+        );
+        const data = unwrapResponse<any>(response.data);
+
+        const rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
+        const questions = rawQuestions.map((q: any) => ({
+            ...q,
+            questionId: q.questionId || q.id || '',
+            questionType: q.questionType || q.type || 'SQL',
+            content: q.content || q.questionText || '',
+            points: q.points ?? 0,
+            sortOrder: q.sortOrder ?? 0,
+            submittedAnswer: q.submittedAnswer ?? q.userAnswer ?? '',
+            score: q.score ?? 0,
+            isCorrect: Boolean(q.isCorrect),
+            solutionQuery: q.solutionQuery || '',
+            mcCorrectOption: q.mcCorrectOption || '',
+            explanation: q.explanation || '',
+        }));
+
+        return {
+            ...data,
+            sessionId: data?.sessionId || sessionId,
+            totalScore: data?.totalScore ?? data?.score ?? 0,
+            status: data?.status || 'COMPLETED',
+            durationDeducted: data?.durationDeducted ?? data?.durationSeconds ?? 0,
+            durationSeconds: data?.durationSeconds ?? data?.durationDeducted ?? 0,
+            questions,
         };
     },
 };

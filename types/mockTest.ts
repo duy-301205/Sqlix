@@ -64,9 +64,12 @@ export interface MockTestPagination {
 
 export interface MultipleChoiceOption {
     id?: string | number;
+    key?: string;
     label?: string;
-    text: string;
+    text?: string;
+    content?: string;
     value?: string;
+    isCorrect?: boolean;
     [key: string]: any;
 }
 
@@ -129,6 +132,47 @@ export interface SubmitAnswerResponse {
         errorMessage?: string | null;
         [key: string]: any;
     };
+    [key: string]: any;
+}
+
+/**
+ * Kết quả chi tiết từng câu hỏi trả về từ GET /api/test-sessions/{sessionId}/result
+ */
+export interface QuestionResultItem {
+    questionId: string;
+    questionType: 'SQL' | 'MULTIPLE_CHOICE' | 'sql_query' | 'multiple_choice' | string;
+    content: string;
+    points: number;
+    sortOrder: number;
+    requirements?: string[];
+    expectedColumns?: string[];
+    mcOptions?: MultipleChoiceOption[];
+    databaseId?: string;
+    schemaData?: any;
+    submittedAnswer?: string | null;
+    score: number;
+    isCorrect: boolean;
+    solutionQuery?: string | null;
+    mcCorrectOption?: string | null;
+    explanation?: string | null;
+    [key: string]: any;
+}
+
+/**
+ * Kết quả toàn bài thi trả về từ GET /api/test-sessions/{sessionId}/result
+ */
+export interface TestResultResponse {
+    sessionId: string;
+    totalScore: number;
+    maxScore?: number;
+    passingScore?: number;
+    isPassed?: boolean;
+    status: string;
+    durationDeducted?: number;
+    durationSeconds?: number;
+    testTitle?: string;
+    testId?: string;
+    questions: QuestionResultItem[];
     [key: string]: any;
 }
 

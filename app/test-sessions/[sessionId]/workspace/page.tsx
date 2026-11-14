@@ -55,13 +55,21 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
         try {
             const data = await mockTestService.getTestWorkspace(sessionId);
             if (data && data.questions && data.questions.length > 0) {
+                const normalizedQuestions = data.questions.map((q: any, idx: number) => {
+                    const qId = String(q.id || q.questionId || `q-${idx + 1}`);
+                    return {
+                        ...q,
+                        id: qId,
+                        questionId: qId,
+                    };
+                });
                 setWorkspace(data);
-                setQuestions(data.questions);
+                setQuestions(normalizedQuestions);
 
                 const initialAnswers: Record<string, string> = {};
                 const initialAnswered: Record<string, boolean> = {};
 
-                data.questions.forEach((q) => {
+                normalizedQuestions.forEach((q) => {
                     if (q.userAnswer) {
                         initialAnswers[q.id] = q.userAnswer;
                         initialAnswered[q.id] = true;
@@ -250,7 +258,8 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
         }
     }, [sessionId, router]);
 
-    const toggleFlag = (qId: string) => {
+    const toggleFlag = (qId?: string) => {
+        if (!qId) return;
         setFlaggedQuestions((prev) => ({ ...prev, [qId]: !prev[qId] }));
     };
 
@@ -421,24 +430,23 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
 
                                         <div className="space-y-2.5">
                                             {(currentQuestion.mcOptions || []).map((opt: any, optIdx: number) => {
-                                                const optLabel =
+                                                const optKey =
                                                     typeof opt === 'object'
-                                                        ? opt.label || opt.id || String.fromCharCode(65 + optIdx)
+                                                        ? opt.key || opt.label || opt.id || String.fromCharCode(65 + optIdx)
                                                         : String.fromCharCode(65 + optIdx);
                                                 const optText =
                                                     typeof opt === 'object'
-                                                        ? opt.text || opt.value || opt.label
-                                                        : opt;
-                                                const optValue =
-                                                    typeof opt === 'object'
-                                                        ? opt.value || opt.label || opt.id || optText
-                                                        : opt;
+                                                        ? opt.content || opt.text || opt.value || opt.label || ''
+                                                        : String(opt || '');
+                                                const optValue = String(optKey);
                                                 const isSelected =
-                                                    currentAnswer === optValue || currentAnswer === optLabel;
+                                                    currentAnswer === optValue ||
+                                                    currentAnswer === optKey ||
+                                                    (optText && currentAnswer === optText);
 
                                                 return (
                                                     <button
-                                                        key={optIdx}
+                                                        key={optKey || optIdx}
                                                         type="button"
                                                         onClick={() => handleSaveAnswer(optValue)}
                                                         className={`w-full p-4 rounded-2xl border text-left transition-all flex items-start gap-4 cursor-pointer group ${
@@ -454,9 +462,9 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                                                                     : 'bg-slate-100 text-slate-600 border-slate-200 group-hover:bg-slate-200'
                                                             }`}
                                                         >
-                                                            {optLabel}
+                                                            {optKey}
                                                         </span>
-                                                        <span className="text-xs sm:text-sm font-medium leading-relaxed pt-1 font-mono flex-1">
+                                                        <span className="text-xs sm:text-sm font-medium leading-relaxed pt-1 flex-1">
                                                             {optText}
                                                         </span>
                                                         {isSelected && (

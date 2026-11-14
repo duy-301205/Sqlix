@@ -1002,7 +1002,7 @@ export default function MockTestHistoryPage() {
 
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-xs font-bold text-slate-600">
-                                                        {q.points} / {q.maxPoints || q.points || 20} điểm
+                                                        {q.points ?? q.score ?? 0} / {q.maxPoints ?? q.maxScore ?? 20} điểm
                                                     </span>
                                                     {q.isCorrect ? (
                                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
@@ -1017,7 +1017,7 @@ export default function MockTestHistoryPage() {
                                             </div>
 
                                             <p className="font-semibold text-slate-900 text-xs sm:text-sm mb-3">
-                                                {q.questionText}
+                                                {q.questionText || q.content}
                                             </p>
 
                                             <div className="mb-3">
@@ -1031,7 +1031,7 @@ export default function MockTestHistoryPage() {
                                                             : 'bg-white border border-rose-200 text-rose-700'
                                                     }`}
                                                 >
-                                                    {q.userAnswer || '(Không có câu trả lời)'}
+                                                    {q.userAnswer || q.submittedAnswer || '(Không có câu trả lời)'}
                                                 </div>
                                             </div>
 
@@ -1039,9 +1039,21 @@ export default function MockTestHistoryPage() {
                                                 <span className="text-xs font-bold text-emerald-700 uppercase block mb-1">
                                                     Đáp án chính xác:
                                                 </span>
-                                                <div className="p-3 rounded-lg text-xs font-mono bg-slate-900 text-emerald-400 whitespace-pre-wrap">
-                                                    {q.solutionAnswer}
-                                                </div>
+                                                {q.type === 'MULTIPLE_CHOICE' || q.type === 'multiple_choice' ? (
+                                                    <div className="p-3 rounded-lg text-xs font-semibold bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-2">
+                                                        <span className="w-6 h-6 rounded-md bg-emerald-600 text-white font-bold flex items-center justify-center text-xs shadow-xs">
+                                                            {q.solutionAnswer || q.correctAnswer || q.mcCorrectOption || '?'}
+                                                        </span>
+                                                        <span>
+                                                            Phương án chính xác:{' '}
+                                                            <strong>{q.solutionAnswer || q.correctAnswer || q.mcCorrectOption || 'Chưa cập nhật'}</strong>
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="p-3 rounded-lg text-xs font-mono bg-slate-900 text-emerald-400 whitespace-pre-wrap border border-slate-800">
+                                                        {q.solutionAnswer || q.correctAnswer || q.solutionQuery || '(Chưa có câu truy vấn mẫu)'}
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {q.explanation && (
