@@ -32,6 +32,7 @@ export interface AdminHistoryItem {
     userAvatar?: string;
     userEmail?: string;
     maxScore?: number;
+    passingScore?: number;
     mockTestId?: string;
     correctAnswersCount?: number;
     totalQuestions?: number;

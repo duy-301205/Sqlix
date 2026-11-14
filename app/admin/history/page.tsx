@@ -52,6 +52,7 @@ const normalizeHistoryItem = (
         testTitle: item.testTitle || item.mockTestTitle || 'Đề thi thử SQL',
         score: rawScore,
         maxScore: calculatedMaxScore,
+        passingScore: item.passingScore !== undefined ? Number(item.passingScore) : Math.round(calculatedMaxScore * 0.6),
         isPassed: rawPassed,
         status: item.status || 'COMPLETED',
         durationSeconds: Number(item.durationSeconds ?? 1800),
@@ -860,6 +861,11 @@ export default function AdminHistoryPage() {
                                     }`}>
                                         {viewingSession.score} / {viewingSession.maxScore || 100}
                                     </span>
+                                    {viewingSession.passingScore !== undefined && (
+                                        <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">
+                                            (Điểm đạt: {viewingSession.passingScore})
+                                        </span>
+                                    )}
                                 </div>
 
                                 <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs">
