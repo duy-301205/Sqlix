@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, use, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
+import AttemptLeaveGuard from '@/app/components/AttemptLeaveGuard';
 import Header from '@/app/components/Header';
 import mockTestService, {
     TestWorkspaceResponse,
@@ -48,6 +49,16 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
     const [activeLeftTab, setActiveLeftTab] = useState<'problem' | 'schema'>('problem');
 
     const autoSubmittedRef = useRef(false);
+    const savedAnswersRef = useRef<Record<string, string>>({});
+    const answersRef = useRef(userAnswers);
+    answersRef.current = userAnswers;
+    const questionsRef = useRef(questions);
+    questionsRef.current = questions;
+    const pendingSavesRef = useRef(new Map<string, Promise<void>>());
+    const finishPromiseRef = useRef<Promise<void> | null>(null);
+    const finishedRef = useRef(false);
+    const leavingRef = useRef(false);
+    const [submissionError, setSubmissionError] = useState('');
 
     // 1. Tải dữ liệu phòng thi từ API
     const loadWorkspace = useCallback(async () => {
@@ -77,6 +88,7 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                         initialAnswers[q.id] = q.sampleQuery;
                     }
                 });
+                savedAnswersRef.current = { ...initialAnswers };
                 setUserAnswers(initialAnswers);
                 setAnsweredStatus(initialAnswered);
             } else {
@@ -209,54 +221,92 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
         }
     };
 
-    // 4. Xử lý "Lưu đáp án" câu hiện tại (submitAnswer)
     const handleSaveAnswer = async (answerValue?: string) => {
-        if (!currentQuestion?.id || isSubmittingTest) return;
-
-        const valToSave = answerValue !== undefined ? answerValue : currentAnswer;
-        if (!valToSave.trim()) return;
-
-        setUserAnswers((prev) => ({ ...prev, [currentQuestion.id]: valToSave }));
-        setSavingStatus((prev) => ({ ...prev, [currentQuestion.id]: true }));
-
+        if (!currentQuestion?.id || finishPromiseRef.current || finishedRef.current) return;
+        const questionId = currentQuestion.id;
+        const value = answerValue !== undefined ? answerValue : currentAnswer;
+        if (!value.trim()) return;
+        setUserAnswers((prev) => ({ ...prev, [questionId]: value }));
+        setSavingStatus((prev) => ({ ...prev, [questionId]: true }));
+        const previous = pendingSavesRef.current.get(questionId);
+        const save = (async () => {
+            await previous?.catch(() => {});
+            await mockTestService.submitAnswer(sessionId, questionId, value);
+            savedAnswersRef.current[questionId] = value;
+            setAnsweredStatus((prev) => ({ ...prev, [questionId]: true }));
+        })();
+        pendingSavesRef.current.set(questionId, save);
         try {
-            await mockTestService.submitAnswer(sessionId, currentQuestion.id, valToSave);
-            setAnsweredStatus((prev) => ({ ...prev, [currentQuestion.id]: true }));
-        } catch (err: any) {
-            console.error(`[SubmitAnswer] Lỗi khi lưu câu ${currentQuestion.id}:`, err);
-            setAnsweredStatus((prev) => ({ ...prev, [currentQuestion.id]: true }));
+            await save;
+        } catch (error: any) {
+            setSubmissionError(error?.response?.data?.message || error?.message || 'Không thể lưu đáp án. Vui lòng thử lại.');
         } finally {
-            setSavingStatus((prev) => ({ ...prev, [currentQuestion.id]: false }));
+            if (pendingSavesRef.current.get(questionId) === save) {
+                pendingSavesRef.current.delete(questionId);
+                setSavingStatus((prev) => ({ ...prev, [questionId]: false }));
+            }
         }
     };
 
-    // 5. Xử lý Nộp toàn bài thi (Submit Test)
-    const handleSubmitTest = async () => {
-        if (isSubmittingTest) return;
+    const finishCurrentTest = useCallback((): Promise<void> => {
+        if (finishedRef.current) return Promise.resolve();
+        if (finishPromiseRef.current) return finishPromiseRef.current;
         setIsSubmittingTest(true);
-
-        try {
-            await mockTestService.submitTest(sessionId);
-            router.push(`/test-sessions/${encodeURIComponent(sessionId)}/result`);
-        } catch (err: any) {
-            console.error('[SubmitTest] Lỗi khi nộp bài thi:', err);
-            router.push(`/test-sessions/${encodeURIComponent(sessionId)}/result`);
-        } finally {
+        setSubmissionError('');
+        const finish = (async () => {
+            await Promise.allSettled([...pendingSavesRef.current.values()]);
+            const answers = { ...answersRef.current };
+            for (const question of questionsRef.current) {
+                const answer = answers[question.id] || '';
+                if (!autoSubmittedRef.current && question.id in answers && answer !== savedAnswersRef.current[question.id]) {
+                    try {
+                        await mockTestService.submitAnswer(sessionId, question.id, answer);
+                        savedAnswersRef.current[question.id] = answer;
+                    } catch (error: any) {
+                        if ([1401, 1403].includes(error?.response?.data?.code)) {
+                            await mockTestService.getTestResult(sessionId);
+                            finishedRef.current = true;
+                            return;
+                        }
+                        // A question with no retries keeps its last graded answer when the test ends.
+                        if (error?.response?.data?.code !== 1405) throw error;
+                    }
+                }
+            }
+            try {
+                await mockTestService.submitTest(sessionId);
+            } catch (error: any) {
+                if (![1401, 1403].includes(error?.response?.data?.code)) throw error;
+                await mockTestService.getTestResult(sessionId);
+            }
+            finishedRef.current = true;
+        })().finally(() => {
+            finishPromiseRef.current = null;
             setIsSubmittingTest(false);
+        });
+        finishPromiseRef.current = finish;
+        return finish;
+    }, [sessionId]);
+
+    const handleSubmitTest = async () => {
+        try {
+            await finishCurrentTest();
+            setShowConfirmModal(false);
+            if (!leavingRef.current) router.push(`/test-sessions/${encodeURIComponent(sessionId)}/result`);
+        } catch (error: any) {
+            setSubmissionError(error?.response?.data?.message || error?.message || 'Không thể nộp bài thi. Vui lòng thử lại.');
             setShowConfirmModal(false);
         }
     };
 
     const handleAutoSubmit = useCallback(async () => {
-        setIsSubmittingTest(true);
         try {
-            await mockTestService.submitTest(sessionId);
-        } catch (e) {
-            console.error('[AutoSubmit] Lỗi nộp bài tự động:', e);
-        } finally {
-            router.push(`/test-sessions/${encodeURIComponent(sessionId)}/result`);
+            await finishCurrentTest();
+            if (!leavingRef.current) router.push(`/test-sessions/${encodeURIComponent(sessionId)}/result`);
+        } catch (error: any) {
+            setSubmissionError(error?.response?.data?.message || error?.message || 'Không thể tự động nộp bài. Vui lòng thử lại.');
         }
-    }, [sessionId, router]);
+    }, [finishCurrentTest, sessionId, router]);
 
     const toggleFlag = (qId?: string) => {
         if (!qId) return;
@@ -271,10 +321,17 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
             suppressHydrationWarning
         >
             <Sidebar />
+            <AttemptLeaveGuard key={sessionId} isActive={() => !!workspace && !finishedRef.current}
+                onFinish={async () => {
+                    leavingRef.current = true;
+                    try { await finishCurrentTest(); } catch (error) { leavingRef.current = false; throw error; }
+                }}
+                message="Nếu thoát, các đáp án đang nhập sẽ được lưu và bài thi sẽ được nộp ngay. Những câu chưa trả lời được tính 0 điểm; phiên thi này sẽ kết thúc." />
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" suppressHydrationWarning>
                 <Header userName="Duy Hoàng" streakCount={7} />
 
+                {submissionError && <p role="alert" className="bg-rose-50 px-6 py-3 text-sm text-rose-600">{submissionError}</p>}
                 {/* Top Controls Header */}
                 <div className="bg-white border-b border-slate-200 px-6 py-2.5 flex items-center justify-between shrink-0 shadow-xs z-10">
                     <div className="flex items-center gap-3 min-w-0">
@@ -658,6 +715,7 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                                             ))}
                                         </div>
                                         <textarea
+                                            disabled={isSubmittingTest}
                                             value={currentAnswer}
                                             onChange={(e) =>
                                                 setUserAnswers((prev) => ({

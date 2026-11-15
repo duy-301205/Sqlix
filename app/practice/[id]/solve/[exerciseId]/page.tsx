@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, use, useCallback } from 'react';
+import { useState, useEffect, use, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
+import AttemptLeaveGuard from '@/app/components/AttemptLeaveGuard';
 import Header from '@/app/components/Header';
 import { DATABASES_DETAIL } from '../../data';
 import { DATABASE_EXERCISES, Exercise } from '../../exercisesData';
@@ -61,8 +62,17 @@ export default function SolveExercisePage({ params }: SolvePageProps) {
     const [submitResult, setSubmitResult] = useState<SubmitQueryResponse | null>(null);
     const [showSubmitModal, setShowSubmitModal] = useState(false);
 
+    const savedQueryRef = useRef<string | null>(null);
+    const savedResultRef = useRef<SubmitQueryResponse | null>(null);
+    const submissionPromiseRef = useRef<Promise<SubmitQueryResponse> | null>(null);
+    const [submissionError, setSubmissionError] = useState('');
+
     // 1. Tải thông tin Workspace và Database Detail từ API
     const loadExerciseData = useCallback(async () => {
+        savedQueryRef.current = null;
+        savedResultRef.current = null;
+        setSubmitResult(null);
+        setSubmissionError('');
         setIsLoadingData(true);
         try {
             const [wsData, dbData] = await Promise.allSettled([
@@ -163,63 +173,35 @@ export default function SolveExercisePage({ params }: SolvePageProps) {
         }
     };
 
-    // 3. Xử lý hành động "Nộp bài" (Submit Query)
+    const saveCurrentAttempt = (): Promise<SubmitQueryResponse> => {
+        if (submissionPromiseRef.current) {
+            return submissionPromiseRef.current.then(() => saveCurrentAttempt());
+        }
+        if (savedQueryRef.current === codeQuery && savedResultRef.current) return Promise.resolve(savedResultRef.current);
+        const query = codeQuery;
+        setIsSubmitting(true);
+        setSubmissionError('');
+        const promise = practiceService.finishExercise(exerciseId, query).then((result) => {
+            savedQueryRef.current = query;
+            savedResultRef.current = result;
+            setSubmitResult(result);
+            if (result.actualResult) setRunResult(result.actualResult);
+            return result;
+        }).finally(() => {
+            submissionPromiseRef.current = null;
+            setIsSubmitting(false);
+        });
+        submissionPromiseRef.current = promise;
+        return promise;
+    };
+
     const handleSubmitCode = async () => {
         if (!codeQuery.trim() || isRunning || isSubmitting) return;
-
-        setIsSubmitting(true);
         try {
-            const result = await practiceService.submitQuery(exerciseId, codeQuery);
-            setSubmitResult(result);
+            await saveCurrentAttempt();
             setShowSubmitModal(true);
-
-            // Nếu API có trả về actualResult thì cập nhật bảng hiển thị
-            if (result.actualResult) {
-                setRunResult(result.actualResult);
-            }
         } catch (error: any) {
-            console.error('[SubmitQuery] Lỗi khi gọi API submit:', error);
-            const backendErrorMsg =
-                error?.response?.data?.message ||
-                error?.response?.data?.result?.feedback ||
-                error?.response?.data?.feedback;
-
-            if (backendErrorMsg) {
-                setSubmitResult({
-                    status: 'ERROR',
-                    score: 0,
-                    feedback: backendErrorMsg,
-                });
-                setShowSubmitModal(true);
-            } else {
-                // Fallback mô phỏng chấm điểm offline
-                console.warn('[SubmitQuery] Fallback mô phỏng chấm điểm.');
-                const sanitized = codeQuery.toLowerCase();
-                const isPassed =
-                    sanitized.includes('select') &&
-                    sanitized.includes('from') &&
-                    (sanitized.includes('where') || sanitized.includes('join') || sanitized.includes('group by'));
-
-                const simulatedResult: SubmitQueryResponse = {
-                    status: isPassed ? 'PASSED' : 'FAILED',
-                    score: isPassed ? 100 : 65,
-                    feedback: isPassed
-                        ? 'Chúc mừng! Câu lệnh truy vấn của bạn hoàn toàn chính xác và tối ưu hiệu năng.'
-                        : 'Câu lệnh đã thực thi nhưng chưa đáp ứng đủ các điều kiện lọc và nhóm theo yêu cầu đề bài.',
-                    actualResult: {
-                        columns: Object.keys(fallbackExercise.mockData[0] || {}),
-                        rows: fallbackExercise.mockData,
-                        executionTimeMs: 24,
-                    },
-                };
-                setSubmitResult(simulatedResult);
-                setShowSubmitModal(true);
-                if (simulatedResult.actualResult) {
-                    setRunResult(simulatedResult.actualResult);
-                }
-            }
-        } finally {
-            setIsSubmitting(false);
+            setSubmissionError(error?.response?.data?.message || error?.message || 'Không thể nộp bài. Vui lòng thử lại.');
         }
     };
 
@@ -231,10 +213,14 @@ export default function SolveExercisePage({ params }: SolvePageProps) {
             suppressHydrationWarning
         >
             <Sidebar />
+            <AttemptLeaveGuard key={exerciseId} isActive={() => !!workspace && savedQueryRef.current !== codeQuery}
+                onFinish={async () => { await saveCurrentAttempt(); }}
+                message="Nếu thoát, câu SQL hiện tại sẽ được chấm và lưu để kết thúc lượt luyện tập. Nếu chưa có câu trả lời, lượt này được ghi nhận 0 điểm." />
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
                 <Header userName="Duy Hoàng" streakCount={7} />
 
+                {submissionError && <p role="alert" className="bg-rose-50 px-6 py-3 text-sm text-rose-600">{submissionError}</p>}
                 {/* Top Header Controls */}
                 <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">

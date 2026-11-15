@@ -157,6 +157,11 @@ export const practiceService = {
      * @param query - Chuỗi câu lệnh SQL người dùng nộp
      * @returns Kết quả chấm điểm SubmitQueryResponse (status, score, feedback, actualResult)
      */
+    finishExercise: async (exerciseId: string, query: string): Promise<SubmitQueryResponse> => {
+        const response = await apiClient.post(`/api/practice/exercises/${encodeURIComponent(exerciseId)}/finish`, { query });
+        return unwrapResponse<SubmitQueryResponse>(response.data);
+    },
+
     submitQuery: async (exerciseId: string, query: string): Promise<SubmitQueryResponse> => {
         const response = await apiClient.post<any>(
             `/api/practice/exercises/${encodeURIComponent(exerciseId)}/submit`,

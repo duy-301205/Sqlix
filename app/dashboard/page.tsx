@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
@@ -31,10 +31,11 @@ export default function DashboardPage() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const hasFetchedRef = useRef(false);
+    const requestRef = useRef(0);
 
-    const fetchDashboardData = async () => {
-        setIsLoading(true);
+    const fetchDashboardData = useCallback(async (silent = false) => {
+        const requestId = ++requestRef.current;
+        if (!silent) setIsLoading(true);
         setErrorMessage(null);
 
         try {
@@ -45,6 +46,7 @@ export default function DashboardPage() {
                 dashboardService.getActivityChart(),
                 dashboardService.getRecentActivities(),
             ]);
+            if (requestId !== requestRef.current) return;
 
             if (overviewRes.status === 'fulfilled') setOverview(overviewRes.value);
             if (masteryRes.status === 'fulfilled') setMastery(masteryRes.value);
@@ -65,20 +67,29 @@ export default function DashboardPage() {
                 setErrorMessage(code ? `[Lỗi ${code}] ${backendMsg}` : backendMsg);
             }
         } catch (err: any) {
+            if (requestId !== requestRef.current) return;
             console.error('Lỗi khi tải dữ liệu dashboard:', err);
             setErrorMessage('Có lỗi xảy ra khi tải dữ liệu bảng điều khiển.');
         } finally {
-            setIsLoading(false);
+            if (requestId === requestRef.current) setIsLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
-        // Tránh gọi lặp 2 lần do React StrictMode trong môi trường Development
-        if (hasFetchedRef.current) return;
-        hasFetchedRef.current = true;
-
-        fetchDashboardData();
-    }, []);
+        void fetchDashboardData();
+        const refresh = () => {
+            if (document.visibilityState === 'visible') void fetchDashboardData(true);
+        };
+        window.addEventListener('focus', refresh);
+        window.addEventListener('pageshow', refresh);
+        document.addEventListener('visibilitychange', refresh);
+        return () => {
+            ++requestRef.current;
+            window.removeEventListener('focus', refresh);
+            window.removeEventListener('pageshow', refresh);
+            document.removeEventListener('visibilitychange', refresh);
+        };
+    }, [fetchDashboardData]);
 
     // 1. Số liệu tổng quan (với fallback tính toán an toàn)
     const completedLessons = overview?.totalLessonsCompleted ?? 0;
@@ -95,7 +106,7 @@ export default function DashboardPage() {
         (totalExercises > 0 ? Math.round((completedExercises / totalExercises) * 100) : 0);
 
     const averageScore = overview?.averageScore ?? overview?.average_score ?? 0;
-    const rankingTier = 'Điểm các lượt nộp đã chấm';
+    const rankingTier = 'Bài thực hành và thi thử';
     const rankingPercentile = 'Thang 100';
 
     const studyTimeHours = (overview?.totalStudyTimeSeconds ?? 0) / 3600;
@@ -113,12 +124,6 @@ export default function DashboardPage() {
 
                 {/* Scrollable Dashboard Body */}
                 <main className="flex-1 min-w-0 overflow-y-auto px-4 sm:px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8">
-                    <nav aria-label="Điều hướng học viên" className="md:hidden flex gap-4 overflow-x-auto text-xs font-bold text-blue-600">
-                        <Link href="/learning">Bài học</Link>
-                        <Link href="/practice">Bài tập</Link>
-                        <Link href="/mock-tests">Thi thử</Link>
-                        <Link href="/history">Lịch sử</Link>
-                    </nav>
                     {/* Error Banner */}
                     {errorMessage && (
                         <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm font-semibold flex items-center justify-between shadow-xs">
@@ -129,7 +134,7 @@ export default function DashboardPage() {
                                 <span>{errorMessage}</span>
                             </div>
                             <button
-                                onClick={fetchDashboardData}
+                                onClick={() => void fetchDashboardData()}
                                 className="px-3 py-1 bg-white border border-rose-300 rounded-lg text-rose-700 hover:bg-rose-100 text-xs font-bold cursor-pointer transition-all"
                             >
                                 Thử lại
@@ -329,7 +334,7 @@ export default function DashboardPage() {
                                     <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100">
                                         <div>
                                             <h3 className="font-black text-slate-900 text-lg">Thống kê hoạt động</h3>
-                                            <p className="text-xs text-slate-500 mt-0.5">Tương quan giữa số bài tập và điểm số</p>
+                                            <p className="text-xs text-slate-500 mt-0.5">Lượt nộp bài thực hành và đề thi thử đã hoàn thành</p>
                                         </div>
                                         <div className="px-3.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700">
                                             30 ngày gần nhất

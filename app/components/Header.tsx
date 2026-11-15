@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import userService, { UserProfile } from '@/services/userService';
+import { requestAttemptExit } from './AttemptLeaveGuard';
 import authService, { checkCanAccessAdmin } from '@/services/authService';
 
 interface HeaderProps {
@@ -202,7 +203,7 @@ export default function Header({
 
                             <button
                                 type="button"
-                                onClick={handleLogout}
+                                onClick={() => requestAttemptExit(handleLogout)}
                                 disabled={isLoggingOut}
                                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer text-left disabled:opacity-50"
                             >
