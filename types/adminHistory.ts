@@ -10,7 +10,8 @@ export interface AdminHistoryFilterParams {
     toDate?: string;   // Định dạng ISO-8601
     minScore?: number;
     maxScore?: number;
-    status?: string;
+    status?: 'IN_PROGRESS' | 'COMPLETED' | 'TIMEOUT';
+    isPassed?: boolean;
     page?: number;
     size?: number;
     sortBy?: string;
@@ -32,6 +33,7 @@ export interface AdminHistoryItem {
     userAvatar?: string;
     userEmail?: string;
     maxScore?: number;
+    passingScore?: number;
     mockTestId?: string;
     correctAnswersCount?: number;
     totalQuestions?: number;

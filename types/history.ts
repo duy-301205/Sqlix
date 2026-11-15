@@ -35,6 +35,8 @@ export interface HistoryItem {
     correctAnswers?: number;
     totalQuestions: number;
     score: number;
+    maxScore?: number;
+    passingScore?: number;
     isPassed: boolean;
     status: 'PASSED' | 'FAILED' | 'TIMEOUT' | 'passed' | 'failed' | 'timeout' | string;
     category?: string;
@@ -80,6 +82,8 @@ export interface HistoryDetail {
     category?: string;
     difficulty: string;
     score: number;
+    maxScore?: number;
+    passingScore?: number;
     isPassed: boolean;
     submittedAt: string;
     durationSeconds: number;
