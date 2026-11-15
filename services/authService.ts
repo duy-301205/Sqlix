@@ -150,6 +150,17 @@ export const authService = {
     },
 
     /**
+     * Yêu cầu gửi lại mã OTP xác thực email
+     * POST /api/auth/resend-verification
+     */
+    resendVerification: async (email?: string): Promise<any> => {
+        const response = await apiClient.post('/api/auth/resend-verification', {
+            email: email ? email.trim() : undefined,
+        });
+        return response.data;
+    },
+
+    /**
      * Yêu cầu gửi link/mã đặt lại mật khẩu
      * POST /api/auth/forgot-password
      */

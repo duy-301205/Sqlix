@@ -64,10 +64,18 @@ export default function RegisterPage() {
                 termsAccepted: agreeTerms,
             });
 
-            setSuccessMessage('Đăng ký tài khoản thành công! Đang chuyển hướng sang trang đăng nhập...');
+            // Lưu tạm thông tin để tự động đăng nhập khi xác thực OTP thành công
+            if (typeof window !== 'undefined') {
+                sessionStorage.setItem('pending_verification_email', email.trim());
+                sessionStorage.setItem('pending_verification_pass', password);
+            }
+
+            setSuccessMessage(
+                `Đăng ký tài khoản thành công! Hệ thống đã gửi mã OTP xác thực về email ${email.trim()}. Đang chuyển sang trang xác thực...`
+            );
             setTimeout(() => {
-                router.push('/login?registered=true');
-            }, 1500);
+                router.push(`/verify?email=${encodeURIComponent(email.trim())}`);
+            }, 1800);
         } catch (err: any) {
             console.error('Registration error:', err);
             const data = err.response?.data;
