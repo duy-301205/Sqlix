@@ -11,7 +11,7 @@ export default function Sidebar() {
     const [canAccessAdmin, setCanAccessAdmin] = useState(false);
 
     useEffect(() => {
-        if (!localStorage.getItem('accessToken')) return;
+        if (!localStorage.getItem('accessToken') && !localStorage.getItem('refreshToken')) return;
         userService.getCurrentUser()
             .then((user) => setCanAccessAdmin(checkCanAccessAdmin(user.role)))
             .catch(() => setCanAccessAdmin(false));

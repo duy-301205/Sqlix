@@ -31,11 +31,11 @@ export default function Header({
 
         const fetchUserData = async () => {
             const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-            if (!token) return;
+            if (!token && !localStorage.getItem('refreshToken')) return;
 
             // Thử trích xuất nhanh thông tin từ JWT Payload làm fallback trước
             try {
-                const parts = token.split('.');
+                const parts = (token || '').split('.');
                 if (parts.length === 3) {
                     const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
                     if (payload && (payload.sub || payload.username)) {

@@ -1,4 +1,4 @@
-import apiClient from './apiClient';
+import apiClient, { storeAuthTokens, clearAuthTokens } from './apiClient';
 
 export type Occupation = 'STUDENT' | 'PROFESSIONAL' | 'OTHER';
 
@@ -81,18 +81,7 @@ export const authService = {
             target?.refresh_token ||
             raw?.refreshToken;
 
-        // Tự động lưu ngay vào localStorage
-        if (typeof window !== 'undefined') {
-            if (accessToken) {
-                localStorage.setItem('accessToken', accessToken);
-                console.log('✅ Đã lưu accessToken vào localStorage:', accessToken.slice(0, 15) + '...');
-            } else {
-                console.warn('⚠️ Không tìm thấy accessToken trong response đăng nhập từ Backend:', raw);
-            }
-            if (refreshToken) {
-                localStorage.setItem('refreshToken', refreshToken);
-            }
-        }
+        if (accessToken) storeAuthTokens(accessToken, refreshToken);
 
         return {
             ...raw,
@@ -130,10 +119,7 @@ export const authService = {
             const response = await apiClient.post('/api/auth/logout', { refreshToken: token });
             return response.data;
         } finally {
-            if (typeof window !== 'undefined') {
-                localStorage.removeItem('accessToken');
-                localStorage.removeItem('refreshToken');
-            }
+            clearAuthTokens();
         }
     },
 
