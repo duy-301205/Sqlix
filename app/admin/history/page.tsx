@@ -47,7 +47,7 @@ const normalizeHistoryItem = (
             item.userAvatar ||
             item.avatarUrl ||
             'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        userEmail: item.userEmail || item.email || `${item.username || 'user'}@gmail.com`,
+        userEmail: item.userEmail || item.email || '',
         mockTestId: item.mockTestId || item.testId || 'test-1',
         testTitle: item.testTitle || item.mockTestTitle || 'Đề thi thử SQL',
         score: rawScore,
@@ -60,7 +60,7 @@ const normalizeHistoryItem = (
         totalQuestions: calculatedTotalQuestions,
         totalQuestionsCount: calculatedTotalQuestions,
         startedAt: item.startedAt || new Date(Date.now() - 3600000).toISOString(),
-        submittedAt: item.submittedAt || new Date().toISOString(),
+        submittedAt: item.submittedAt || '',
     };
 };
 
@@ -97,12 +97,23 @@ export default function AdminHistoryPage() {
     // Advanced Filters State
     const [keyword, setKeyword] = useState<string>('');
     const [selectedTestId, setSelectedTestId] = useState<string>('ALL');
-    const [statusFilter, setStatusFilter] = useState<string>('ALL');
+    const [statusFilter, setStatusFilter] = useState<'ALL' | 'IN_PROGRESS' | 'COMPLETED' | 'TIMEOUT'>('ALL');
+    const historyRequestRef = useRef(0);
     const [isPassedFilter, setIsPassedFilter] = useState<'ALL' | 'PASSED' | 'FAILED'>('ALL');
     const [fromDate, setFromDate] = useState<string>('');
     const [toDate, setToDate] = useState<string>('');
     const [minScore, setMinScore] = useState<string>('');
     const [maxScore, setMaxScore] = useState<string>('');
+    const filterError = useMemo(() => {
+        if (fromDate && toDate && fromDate > toDate) return 'Từ ngày phải trước hoặc bằng đến ngày.';
+        if ([minScore, maxScore].some((value) => value !== '' && (!Number.isInteger(Number(value)) || Number(value) < 0))) {
+            return 'Điểm lọc phải là số nguyên không âm.';
+        }
+        if (minScore !== '' && maxScore !== '' && Number(minScore) > Number(maxScore)) {
+            return 'Điểm tối thiểu phải nhỏ hơn hoặc bằng điểm tối đa.';
+        }
+        return '';
+    }, [fromDate, toDate, minScore, maxScore]);
 
     // Modals
     const [viewingSession, setViewingSession] = useState<AdminHistoryItem | null>(null);
@@ -136,6 +147,13 @@ export default function AdminHistoryPage() {
 
     // 2. Fetch history records from API
     const fetchHistories = useCallback(async () => {
+        const requestId = ++historyRequestRef.current;
+        if (filterError) {
+            setHistories([]);
+            setPagination({ total: 0, page: 0, size, totalPages: 1 });
+            setIsLoading(false);
+            return;
+        }
         setIsLoading(true);
 
         // Build query params
@@ -147,14 +165,13 @@ export default function AdminHistoryPage() {
         if (keyword.trim()) params.keyword = keyword.trim();
         if (selectedTestId !== 'ALL') params.testId = selectedTestId;
         if (statusFilter !== 'ALL') params.status = statusFilter;
-        if (isPassedFilter === 'PASSED') params.status = 'PASSED';
-        if (isPassedFilter === 'FAILED') params.status = 'FAILED';
+        if (isPassedFilter !== 'ALL') params.isPassed = isPassedFilter === 'PASSED';
 
         if (fromDate) {
-            params.fromDate = new Date(`${fromDate}T00:00:00Z`).toISOString();
+            params.fromDate = new Date(`${fromDate}T00:00:00`).toISOString();
         }
         if (toDate) {
-            params.toDate = new Date(`${toDate}T23:59:59Z`).toISOString();
+            params.toDate = new Date(`${toDate}T23:59:59.999`).toISOString();
         }
 
         if (minScore !== '') params.minScore = Number(minScore);
@@ -162,6 +179,7 @@ export default function AdminHistoryPage() {
 
         try {
             const res = await adminHistoryService.getAllHistories(params);
+            if (requestId !== historyRequestRef.current) return;
 
             if (res && Array.isArray(res.items)) {
                 const map = testsMapRef.current;
@@ -185,6 +203,7 @@ export default function AdminHistoryPage() {
                 });
             }
         } catch (err) {
+            if (requestId !== historyRequestRef.current) return;
             console.error('[AdminHistory] Lỗi fetch lịch sử từ API:', err);
             setHistories([]);
             setPagination({
@@ -194,9 +213,9 @@ export default function AdminHistoryPage() {
                 totalPages: 1,
             });
         } finally {
-            setIsLoading(false);
+            if (requestId === historyRequestRef.current) setIsLoading(false);
         }
-    }, [page, size, keyword, selectedTestId, statusFilter, isPassedFilter, fromDate, toDate, minScore, maxScore]);
+    }, [page, size, keyword, selectedTestId, statusFilter, isPassedFilter, fromDate, toDate, minScore, maxScore, filterError]);
 
     useEffect(() => {
         fetchAvailableTests();
@@ -474,7 +493,7 @@ export default function AdminHistoryPage() {
                         <select
                             value={statusFilter}
                             onChange={(e) => {
-                                setStatusFilter(e.target.value);
+                                setStatusFilter(e.target.value as typeof statusFilter);
                                 setPage(0);
                             }}
                             className="w-full text-xs font-semibold bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
@@ -482,6 +501,7 @@ export default function AdminHistoryPage() {
                             <option value="ALL">Tất cả trạng thái</option>
                             <option value="COMPLETED">Đã nộp bài (COMPLETED)</option>
                             <option value="IN_PROGRESS">Đang làm dở (IN_PROGRESS)</option>
+                            <option value="TIMEOUT">Hết giờ (TIMEOUT)</option>
                         </select>
                     </div>
                 </div>
@@ -496,6 +516,7 @@ export default function AdminHistoryPage() {
                         <input
                             type="date"
                             value={fromDate}
+                            max={toDate || undefined}
                             onChange={(e) => {
                                 setFromDate(e.target.value);
                                 setPage(0);
@@ -512,6 +533,7 @@ export default function AdminHistoryPage() {
                         <input
                             type="date"
                             value={toDate}
+                            min={fromDate || undefined}
                             onChange={(e) => {
                                 setToDate(e.target.value);
                                 setPage(0);
@@ -528,7 +550,6 @@ export default function AdminHistoryPage() {
                         <input
                             type="number"
                             min="0"
-                            max="100"
                             step="1"
                             value={minScore}
                             onChange={(e) => {
@@ -548,7 +569,6 @@ export default function AdminHistoryPage() {
                         <input
                             type="number"
                             min="0"
-                            max="100"
                             step="1"
                             value={maxScore}
                             onChange={(e) => {
@@ -561,6 +581,8 @@ export default function AdminHistoryPage() {
                     </div>
                 </div>
             </div>
+
+            {filterError && <p role="alert" className="text-sm text-rose-600">{filterError}</p>}
 
             {/* History Table */}
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
@@ -658,11 +680,13 @@ export default function AdminHistoryPage() {
                                         {/* isPassed Badge */}
                                         <td className="py-4 px-6 text-center">
                                             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                                s.isPassed
+                                                s.status === 'IN_PROGRESS'
+                                                    ? 'bg-slate-50 text-slate-600 border border-slate-200'
+                                                    : s.isPassed
                                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                                     : 'bg-rose-50 text-rose-700 border border-rose-200'
                                             }`}>
-                                                {s.isPassed ? '✓ ĐẠT' : '✕ CHƯA ĐẠT'}
+                                                {s.status === 'IN_PROGRESS' ? 'CHƯA CÓ KẾT QUẢ' : s.isPassed ? '✓ ĐẠT' : '✕ CHƯA ĐẠT'}
                                             </span>
                                         </td>
 

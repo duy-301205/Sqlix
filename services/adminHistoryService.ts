@@ -70,11 +70,13 @@ export const adminHistoryService = {
         const total =
             rawPagination.total ??
             rawPagination.totalElements ??
+            unwrapped?.totalElements ??
             unwrapped?.total ??
             rawData?.total ??
             items.length;
         const totalPages =
             rawPagination.totalPages ??
+            unwrapped?.totalPages ??
             (size > 0 ? Math.ceil(total / size) : 1);
 
         const pagination: AdminHistoryPagination = {
