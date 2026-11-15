@@ -278,12 +278,6 @@ export default function MockTestDetailPage({ params }: PageProps) {
                                         )}
                                     </button>
 
-                                    <Link
-                                        href="/mock-tests"
-                                        className="w-full py-2.5 px-4 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 font-semibold text-xs transition-colors flex items-center justify-center gap-1.5"
-                                    >
-                                        ← Quay lại danh sách đề thi
-                                    </Link>
                                 </div>
                             </div>
                         </div>
