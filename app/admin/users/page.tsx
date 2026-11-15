@@ -48,6 +48,8 @@ export default function AdminUsersPage() {
 
     // Modal state for Delete confirmation
     const [deleteTargetUser, setDeleteTargetUser] = useState<AdminUser | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const usersRequestRef = useRef(0);
 
     // Helper Toast
     const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -69,6 +71,7 @@ export default function AdminUsersPage() {
 
     // ================= Fetch Data từ API =================
     const fetchUsers = useCallback(async () => {
+        const requestId = ++usersRequestRef.current;
         setIsLoading(true);
         setError(null);
         try {
@@ -83,6 +86,7 @@ export default function AdminUsersPage() {
                 page: currentPage,
                 size: pageSize,
             });
+            if (requestId !== usersRequestRef.current) return;
 
             if (res && Array.isArray(res.users)) {
                 setUsers(res.users);
@@ -91,6 +95,7 @@ export default function AdminUsersPage() {
                 throw new Error('Cấu trúc dữ liệu API trả về không hợp lệ');
             }
         } catch (err: any) {
+            if (requestId !== usersRequestRef.current) return;
             console.error('[AdminUsers] Không thể tải dữ liệu từ API máy chủ:', err);
             setError(err?.response?.data?.message || err?.message || 'Không thể đồng bộ danh sách người dùng từ máy chủ.');
             setUsers([]);
@@ -101,7 +106,7 @@ export default function AdminUsersPage() {
                 totalPages: 1,
             });
         } finally {
-            setIsLoading(false);
+            if (requestId === usersRequestRef.current) setIsLoading(false);
         }
     }, [debouncedSearch, roleFilter, statusFilter, currentPage, pageSize]);
 
@@ -276,12 +281,25 @@ export default function AdminUsersPage() {
     };
 
     // Xóa người dùng
-    const handleConfirmDelete = () => {
-        if (!deleteTargetUser) return;
-        setUsers((prev) => prev.filter((u) => u.id !== deleteTargetUser.id));
-        setPagination((p) => ({ ...p, total: Math.max(0, p.total - 1) }));
-        showToast(`Đã xóa tài khoản "${deleteTargetUser.username}".`, 'success');
-        setDeleteTargetUser(null);
+    const handleConfirmDelete = async () => {
+        if (!deleteTargetUser || isDeleting) return;
+        setIsDeleting(true);
+        try {
+            await adminUserService.deleteUser(deleteTargetUser.id);
+            ++usersRequestRef.current;
+            setUsers((prev) => prev.filter((u) => u.id !== deleteTargetUser.id));
+            setDeleteTargetUser(null);
+            showToast(`Đã xóa tài khoản "${deleteTargetUser.username}".`, 'success');
+            if (users.length === 1 && currentPage > 0) {
+                setCurrentPage(currentPage - 1);
+            } else {
+                await fetchUsers();
+            }
+        } catch (err: any) {
+            showToast(err?.response?.data?.message || err?.message || 'Không thể xóa tài khoản. Vui lòng thử lại!', 'error');
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     // Reset filters
@@ -861,6 +879,7 @@ export default function AdminUsersPage() {
                             <button
                                 type="button"
                                 onClick={() => setDeleteTargetUser(null)}
+                                disabled={isDeleting}
                                 className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
                             >
                                 Hủy bỏ
@@ -868,10 +887,11 @@ export default function AdminUsersPage() {
                             <button
                                 type="button"
                                 onClick={handleConfirmDelete}
+                                disabled={isDeleting}
                                 style={{ backgroundColor: '#e11d48', color: '#ffffff' }}
                                 className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
                             >
-                                Xác nhận xóa
+                                {isDeleting ? 'Đang xóa...' : 'Xác nhận xóa'}
                             </button>
                         </div>
                     </div>

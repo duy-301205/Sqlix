@@ -45,6 +45,9 @@ const normalizeAdminUser = (raw: any): AdminUser => {
 };
 
 export const adminUserService = {
+    deleteUser: async (userId: string): Promise<void> => {
+        await apiClient.delete(`/api/admin/users/${encodeURIComponent(userId)}`);
+    },
     /**
      * Lấy danh sách người dùng kèm phân trang và bộ lọc tìm kiếm
      * GET /api/admin/users
