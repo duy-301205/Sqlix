@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import mockTestService, { MockTestDetail } from '@/services/mockTestService';
+import styles from './page.module.css';
 
 interface PageProps {
     params: Promise<{ slug: string }>;
@@ -106,7 +107,7 @@ export default function MockTestDetailPage({ params }: PageProps) {
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" suppressHydrationWarning>
                 <Header userName="Duy Hoàng" streakCount={7} />
 
-                <main className="flex-1 overflow-y-auto px-6 lg:px-10 py-6 w-full max-w-[1400px] mx-auto flex flex-col space-y-6">
+                <main className={styles.main}>
                     {/* Breadcrumbs chuẩn hệ thống */}
                     <nav className="flex items-center gap-2 text-xs font-semibold text-slate-500 shrink-0">
                         <Link
@@ -138,9 +139,9 @@ export default function MockTestDetailPage({ params }: PageProps) {
                             </div>
                         </div>
                     ) : testDetail ? (
-                        <div className="space-y-6">
+                        <div className={styles.content}>
                             {/* Card Thông tin chính */}
-                            <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-xs space-y-5">
+                            <div className={styles.overview}>
                                 <div>
                                     <div className="flex items-center gap-2.5 mb-2 flex-wrap">
                                         <span className={`px-2.5 py-0.5 rounded text-xs font-bold border ${diffColor}`}>
@@ -163,23 +164,23 @@ export default function MockTestDetailPage({ params }: PageProps) {
                                 </div>
 
                                 {/* 4 Ô Thông số thống kê */}
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-100">
-                                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-center space-y-0.5">
+                                <div className={styles.stats}>
+                                    <div className={`${styles.stat} rounded-xl bg-slate-50 border border-slate-100 text-center space-y-0.5`}>
                                         <div className="text-xl font-black text-slate-900">⏱️ {duration}</div>
                                         <div className="text-[11px] text-slate-400 font-semibold uppercase">Phút làm bài</div>
                                     </div>
 
-                                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-center space-y-0.5">
+                                    <div className={`${styles.stat} rounded-xl bg-slate-50 border border-slate-100 text-center space-y-0.5`}>
                                         <div className="text-xl font-black text-slate-900">📄 {questionsCount}</div>
                                         <div className="text-[11px] text-slate-400 font-semibold uppercase">Câu hỏi truy vấn</div>
                                     </div>
 
-                                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-center space-y-0.5">
+                                    <div className={`${styles.stat} rounded-xl bg-slate-50 border border-slate-100 text-center space-y-0.5`}>
                                         <div className="text-xl font-black text-emerald-600">🎯 {passingScore}/{totalScore}</div>
                                         <div className="text-[11px] text-slate-400 font-semibold uppercase">Điểm qua môn</div>
                                     </div>
 
-                                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-center space-y-0.5">
+                                    <div className={`${styles.stat} rounded-xl bg-slate-50 border border-slate-100 text-center space-y-0.5`}>
                                         <div className="text-xl font-black text-blue-600">👥 {(testDetail.participantsCount || 982).toLocaleString('vi-VN')}</div>
                                         <div className="text-[11px] text-slate-400 font-semibold uppercase">Lượt thi</div>
                                     </div>
@@ -187,9 +188,9 @@ export default function MockTestDetailPage({ params }: PageProps) {
                             </div>
 
                             {/* Hai khối: Quy chế bên trái & Bảng xác nhận thi bên phải (Đồng bộ trắng/xám theo hệ thống) */}
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                            <div className={styles.bottom}>
                                 {/* Khối Quy chế & Hướng dẫn */}
-                                <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-slate-200/90 shadow-xs space-y-4">
+                                <div className={styles.rules}>
                                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                                         <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -197,7 +198,7 @@ export default function MockTestDetailPage({ params }: PageProps) {
                                         <span>Quy chế và hướng dẫn phòng thi</span>
                                     </h3>
 
-                                    <ul className="space-y-3 text-xs text-slate-600 leading-relaxed">
+                                    <ul className={`${styles.ruleList} text-xs text-slate-600 leading-relaxed`}>
                                         {(testDetail.rules || [
                                             'Thời gian làm bài sẽ được đếm ngược liên tục ngay khi bạn nhấn "Bắt đầu làm bài".',
                                             'Mỗi câu hỏi trắc nghiệm hoặc SQL yêu cầu thực hiện đúng định dạng và logic truy vấn dữ liệu.',
@@ -222,7 +223,7 @@ export default function MockTestDetailPage({ params }: PageProps) {
                                 </div>
 
                                 {/* Khối Bắt đầu làm bài (Đồng bộ thẻ Card trắng chuẩn Sqlix) */}
-                                <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-xs space-y-5">
+                                <div className={styles.start}>
                                     <div>
                                         <h3 className="text-sm font-bold text-slate-900 mb-1">
                                             Sẵn sàng thử sức?
@@ -233,7 +234,7 @@ export default function MockTestDetailPage({ params }: PageProps) {
                                     </div>
 
                                     {/* Danh sách tóm tắt nhanh */}
-                                    <div className="space-y-2 border-y border-slate-100 py-3.5 text-xs text-slate-600">
+                                    <div className={`${styles.summary} text-xs text-slate-600`}>
                                         <div className="flex justify-between items-center">
                                             <span className="text-slate-400">Thời lượng:</span>
                                             <span className="font-bold text-slate-800">{duration} phút</span>
