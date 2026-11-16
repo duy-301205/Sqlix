@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
+import SqlAnswerBlock from '@/app/components/SqlAnswerBlock';
 import mockTestService, { TestResultResponse } from '@/services/mockTestService';
 import historyService, { HistoryDetail } from '@/services/historyService';
 import {
@@ -350,7 +351,7 @@ export default function TestResultPage({ params }: ResultPageProps) {
                                                         <span className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
                                                             Câu trả lời của bạn:
                                                         </span>
-                                                        <div
+                                                        {isMc ? <div
                                                             className={`p-3 rounded-xl text-xs font-mono whitespace-pre-wrap ${
                                                                 q.isCorrect
                                                                     ? 'bg-emerald-50/50 border border-emerald-200 text-slate-800'
@@ -358,7 +359,7 @@ export default function TestResultPage({ params }: ResultPageProps) {
                                                             }`}
                                                         >
                                                             {q.submittedAnswer || q.userAnswer || '(Chưa chọn câu trả lời)'}
-                                                        </div>
+                                                        </div> : <SqlAnswerBlock query={q.submittedAnswer || q.userAnswer || ''} label="Truy vấn bạn đã nộp" />}
                                                     </div>
 
                                                     {/* Đáp án chính xác */}
@@ -382,9 +383,7 @@ export default function TestResultPage({ params }: ResultPageProps) {
                                                                 </span>
                                                             </div>
                                                         ) : (
-                                                            <div className="p-3.5 rounded-xl text-xs font-mono bg-slate-900 text-emerald-400 whitespace-pre-wrap border border-slate-800 shadow-inner">
-                                                                {q.solutionQuery || q.correctAnswer || q.solutionAnswer || '(Chưa có câu truy vấn mẫu)'}
-                                                            </div>
+                                                            <SqlAnswerBlock query={q.solutionQuery || q.correctAnswer || q.solutionAnswer || ''} label="Đáp án SQL mẫu" />
                                                         )}
                                                     </div>
 

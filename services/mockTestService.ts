@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import type { RunQueryResponse } from '@/types/practice';
 import {
     MockTestParams,
     MockTestSummary,
@@ -41,6 +42,20 @@ const unwrapResponse = <T>(data: any): T => {
 };
 
 export const mockTestService = {
+    runQuery: async (sessionId: string, questionId: string, query: string): Promise<RunQueryResponse> => {
+        const started = performance.now();
+        const response = await apiClient.post(
+            `/api/test-sessions/${encodeURIComponent(sessionId)}/questions/${encodeURIComponent(questionId)}/run`,
+            { query }
+        );
+        const data = unwrapResponse<any>(response.data);
+        const rows = Array.isArray(data?.rows) ? data.rows : [];
+        return {
+            columns: Array.isArray(data?.columns) ? data.columns : [], rows,
+            errorMessage: data?.errorMessage || null,
+            executionTimeMs: Math.round(performance.now() - started), rowCount: rows.length,
+        };
+    },
     /**
      * Lấy danh sách các đề thi thử và phân trang
      * GET /api/mock-tests

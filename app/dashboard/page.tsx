@@ -263,7 +263,7 @@ export default function DashboardPage() {
                                     </div>
                                     <div className="my-4">
                                         <div className="flex items-baseline gap-2">
-                                            <span className="text-3xl font-black text-slate-950">{studyTimeHours}</span>
+                                            <span className="text-3xl font-black text-slate-950">{studyTimeHours.toFixed(2)}</span>
                                             <span className="text-sm font-semibold text-slate-500">giờ</span>
                                         </div>
                                         <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-3">

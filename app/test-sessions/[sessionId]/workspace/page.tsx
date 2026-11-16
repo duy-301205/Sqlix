@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, use, useCallback, useRef } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import workspaceStyles from './ExamWorkspace.module.css';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/app/components/Sidebar';
@@ -12,7 +14,7 @@ import mockTestService, {
     TestWorkspaceResponse,
     WorkspaceQuestion,
 } from '@/services/mockTestService';
-import practiceService, { RunQueryResponse } from '@/services/practiceService';
+import type { RunQueryResponse } from '@/types/practice';
 import ErdTab from '@/app/practice/[id]/components/ErdTab';
 import OverviewTab from '@/app/practice/[id]/components/OverviewTab';
 import { DATABASES_DETAIL } from '@/app/practice/[id]/data';
@@ -49,6 +51,68 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
     const [isSubmittingTest, setIsSubmittingTest] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [activeLeftTab, setActiveLeftTab] = useState<'problem' | 'schema'>('problem');
+    const [leftPanelWidth, setLeftPanelWidth] = useState(40);
+    const [outputHeight, setOutputHeight] = useState(35);
+    const [isEditorFullscreen, setIsEditorFullscreen] = useState(false);
+    const [showReference, setShowReference] = useState(false);
+    const sqlLayoutRef = useRef<HTMLDivElement>(null);
+    const editorPanelRef = useRef<HTMLDivElement>(null);
+    const lineNumbersRef = useRef<HTMLDivElement>(null);
+    const dragRef = useRef<{ type: 'column' | 'row'; cursor: string; selection: string } | null>(null);
+
+    useEffect(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem('sqlix_mock_workspace_layout') || 'null');
+            if (Number.isFinite(saved?.left)) setLeftPanelWidth(Math.max(24, Math.min(65, saved.left)));
+            if (Number.isFinite(saved?.output)) setOutputHeight(Math.max(22, Math.min(65, saved.output)));
+        } catch {}
+        return () => {
+            if (dragRef.current) {
+                document.body.style.cursor = dragRef.current.cursor;
+                document.body.style.userSelect = dragRef.current.selection;
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!mounted) return;
+        const timer = setTimeout(() => {
+            try { localStorage.setItem('sqlix_mock_workspace_layout', JSON.stringify({ left: leftPanelWidth, output: outputHeight })); } catch {}
+        }, 200);
+        return () => clearTimeout(timer);
+    }, [leftPanelWidth, outputHeight, mounted]);
+
+    useEffect(() => {
+        const escape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && !showConfirmModal) setIsEditorFullscreen(false);
+        };
+        window.addEventListener('keydown', escape);
+        return () => window.removeEventListener('keydown', escape);
+    }, [showConfirmModal]);
+
+    const startResize = (event: ReactPointerEvent<HTMLDivElement>, type: 'column' | 'row') => {
+        if (event.button !== 0 || dragRef.current) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        dragRef.current = { type, cursor: document.body.style.cursor, selection: document.body.style.userSelect };
+        document.body.style.cursor = type === 'column' ? 'col-resize' : 'row-resize';
+        document.body.style.userSelect = 'none';
+    };
+    const resize = (event: ReactPointerEvent<HTMLDivElement>) => {
+        const type = dragRef.current?.type;
+        const rect = (type === 'column' ? sqlLayoutRef.current : editorPanelRef.current)?.getBoundingClientRect();
+        if (!type || !rect) return;
+        if (type === 'column' && rect.width) setLeftPanelWidth(Math.max(24, Math.min(65, (event.clientX - rect.left) / rect.width * 100)));
+        if (type === 'row' && rect.height) setOutputHeight(Math.max(22, Math.min(65, (rect.bottom - event.clientY) / rect.height * 100)));
+    };
+    const stopResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+        if (!dragRef.current) return;
+        document.body.style.cursor = dragRef.current.cursor;
+        document.body.style.userSelect = dragRef.current.selection;
+        dragRef.current = null;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    };
+
 
     const autoSubmittedRef = useRef(false);
     const savedAnswersRef = useRef<Record<string, string>>({});
@@ -180,7 +244,7 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
 
         setIsRunningQuery(true);
         try {
-            const result = await practiceService.runQuery(currentQuestion.id, currentAnswer);
+            const result = await mockTestService.runQuery(sessionId, currentQuestion.id, currentAnswer);
             setQueryResults((prev) => ({ ...prev, [currentQuestion.id]: result }));
         } catch (err: any) {
             console.error('[RunQuery] Lỗi khi chạy query:', err);
@@ -189,45 +253,25 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                 err?.response?.data?.result?.errorMessage ||
                 err?.response?.data?.errorMessage;
 
-            if (backendError) {
-                setQueryResults((prev) => ({
-                    ...prev,
-                    [currentQuestion.id]: {
-                        columns: [],
-                        rows: [],
-                        errorMessage: backendError,
-                        executionTimeMs: 0,
-                        rowCount: 0,
-                    },
-                }));
-            } else {
-                // Fallback mô phỏng chạy truy vấn local
-                const mockRows = [
-                    { id: 1, name: 'Sản phẩm mẫu A', price: 150000, category_id: 2 },
-                    { id: 2, name: 'Sản phẩm mẫu B', price: 290000, category_id: 1 },
-                    { id: 3, name: 'Sản phẩm mẫu C', price: 850000, category_id: 3 },
-                ];
-                setQueryResults((prev) => ({
-                    ...prev,
-                    [currentQuestion.id]: {
-                        columns: Object.keys(mockRows[0]),
-                        rows: mockRows,
-                        errorMessage: null,
-                        executionTimeMs: 16,
-                        rowCount: mockRows.length,
-                    },
-                }));
-            }
+            setQueryResults((prev) => ({
+                ...prev,
+                [currentQuestion.id]: {
+                    columns: [], rows: [],
+                    errorMessage: backendError || 'Không thể chạy thử SQL. Vui lòng kiểm tra kết nối và thử lại.',
+                    executionTimeMs: 0, rowCount: 0,
+                },
+            }));
         } finally {
             setIsRunningQuery(false);
         }
     };
 
-    const handleSaveAnswer = async (answerValue?: string) => {
+    const handleSaveAnswer = useCallback(async (answerValue?: string) => {
         if (!currentQuestion?.id || finishPromiseRef.current || finishedRef.current) return;
         const questionId = currentQuestion.id;
         const value = answerValue !== undefined ? answerValue : currentAnswer;
         if (!value.trim()) return;
+        setSubmissionError('');
         setUserAnswers((prev) => ({ ...prev, [questionId]: value }));
         setSavingStatus((prev) => ({ ...prev, [questionId]: true }));
         const previous = pendingSavesRef.current.get(questionId);
@@ -248,7 +292,21 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                 setSavingStatus((prev) => ({ ...prev, [questionId]: false }));
             }
         }
-    };
+    }, [currentQuestion?.id, currentAnswer, sessionId]);
+
+    useEffect(() => {
+        const saveShortcut = (event: KeyboardEvent) => {
+            if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 's') return;
+            event.preventDefault();
+            if (event.repeat || isLoadingWorkspace || isSubmittingTest || showConfirmModal || !currentQuestion?.id) return;
+            if (pendingSavesRef.current.has(currentQuestion.id)) return;
+            // Repeated Ctrl+S on unchanged code must not consume another grading attempt.
+            if (savedAnswersRef.current[currentQuestion.id] === currentAnswer) return;
+            void handleSaveAnswer(currentAnswer);
+        };
+        window.addEventListener('keydown', saveShortcut);
+        return () => window.removeEventListener('keydown', saveShortcut);
+    }, [handleSaveAnswer, currentQuestion?.id, currentAnswer, isLoadingWorkspace, isSubmittingTest, showConfirmModal]);
 
     const finishCurrentTest = useCallback((): Promise<void> => {
         if (finishedRef.current) return Promise.resolve();
@@ -319,10 +377,10 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
 
     return (
         <div
-            className="flex h-screen w-full bg-[#f8fafc] text-slate-800 antialiased overflow-hidden font-sans"
+            className={`flex h-screen w-full bg-[#f8fafc] text-slate-800 antialiased overflow-hidden font-sans ${isEditorFullscreen ? workspaceStyles.expanded : ''}`}
             suppressHydrationWarning
         >
-            <Sidebar />
+            <div className={isEditorFullscreen ? workspaceStyles.hidden : ''}><Sidebar /></div>
             <AttemptLeaveGuard key={sessionId} isActive={() => !!workspace && !finishedRef.current}
                 onFinish={async () => {
                     leavingRef.current = true;
@@ -331,11 +389,11 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                 message="Nếu thoát, các đáp án đang nhập sẽ được lưu và bài thi sẽ được nộp ngay. Những câu chưa trả lời được tính 0 điểm; phiên thi này sẽ kết thúc." />
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" suppressHydrationWarning>
-                <Header userName="Duy Hoàng" />
+                <div className={isEditorFullscreen ? workspaceStyles.hidden : ''}><Header userName="Duy Hoàng" /></div>
 
                 {submissionError && <p role="alert" className="bg-rose-50 px-6 py-3 text-sm text-rose-600">{submissionError}</p>}
                 {/* Top Controls Header */}
-                <div className="bg-white border-b border-slate-200 px-6 py-2.5 flex items-center justify-between shrink-0 shadow-xs z-10">
+                <div className={workspaceStyles.topBar}>
                     <div className="flex items-center gap-3 min-w-0">
                         <Link
                             href="/mock-tests"
@@ -353,19 +411,17 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                     </div>
 
                     {/* Timer & Nút Nộp Bài */}
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className={workspaceStyles.examActions}>
+                        {isEditorFullscreen && <button type="button" className={workspaceStyles.toolbarButton} onClick={() => setIsEditorFullscreen(false)}>Thoát toàn màn hình (Esc)</button>}
                         {/* Đồng hồ đếm ngược đồng bộ Database */}
                         <div
-                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-mono text-xs font-black border transition-colors ${
-                                isTimeUrgent
-                                    ? 'bg-rose-50 border-rose-300 text-rose-600 animate-pulse'
-                                    : 'bg-slate-100 border-slate-200 text-slate-800'
-                            }`}
+                            role="timer" aria-label="Thời gian còn lại"
+                            className={`${workspaceStyles.timer} ${isTimeUrgent ? workspaceStyles.urgent : ''}`}
                         >
-                            <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span>{formattedTimer}</span>
+                            <span><span className={workspaceStyles.timerLabel}>Thời gian còn lại</span><span className={workspaceStyles.timerValue}>{formattedTimer}</span></span>
                         </div>
 
                         {/* Nút Nộp bài thi */}
@@ -373,7 +429,7 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                             type="button"
                             onClick={() => setShowConfirmModal(true)}
                             disabled={isSubmittingTest}
-                            className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            className={workspaceStyles.submit}
                         >
                             <span>Nộp bài thi</span>
                             <span>⚡</span>
@@ -382,7 +438,7 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                 </div>
 
                 {/* Main Workspace Body */}
-                <div className={navigatorStyles.workspace}>
+                <div className={`${navigatorStyles.workspace} ${workspaceStyles.examWorkspace}`}>
                     <div className={navigatorStyles.main}>
                     {isLoadingWorkspace ? (
                         <div className="h-full flex items-center justify-center text-slate-400 text-xs gap-2">
@@ -517,9 +573,10 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                             /* ==============================================================
                                GIAO DIỆN CÂU HỎI TRUY VẤN SQL: CHIA 2 CỘT (CHIA ĐÔI 50% / 50%)
                                ============================================================== */
-                            <div className="grid grid-cols-2 h-full w-full">
+                            <div ref={sqlLayoutRef} className={workspaceStyles.sqlLayout}
+                                style={{ '--reference-width': `${leftPanelWidth}%`, '--output-height': `${outputHeight}%` } as CSSProperties}>
                                 {/* CỘT 1 (BÊN TRÁI 50%): ĐỀ BÀI + ERD + CẤU TRÚC BẢNG */}
-                                <div className="h-full border-r border-slate-200 bg-white flex flex-col overflow-hidden">
+                                <div className={`${workspaceStyles.reference} ${isEditorFullscreen && !showReference ? workspaceStyles.hidden : ''}`}>
                                     <div className="flex border-b border-slate-200 px-4 bg-slate-50 shrink-0">
                                         <button
                                             type="button"
@@ -616,9 +673,13 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                                 </div>
 
                                 {/* CỘT 2 (BÊN PHẢI 50%): SQL EDITOR & RESULT TABLE (Y HỆT PRACTICE) */}
-                                <div className="h-full flex flex-col bg-white overflow-hidden">
+                                {(!isEditorFullscreen || showReference) && <div role="separator" aria-label="Điều chỉnh độ rộng đề bài" aria-orientation="vertical" aria-valuemin={24} aria-valuemax={65} aria-valuenow={Math.round(leftPanelWidth)} tabIndex={0}
+                                    className={workspaceStyles.columnHandle}
+                                    onPointerDown={(e) => startResize(e, 'column')} onPointerMove={resize} onPointerUp={stopResize} onPointerCancel={stopResize} onLostPointerCapture={stopResize}
+                                    onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setLeftPanelWidth(v => Math.max(24, Math.min(65, v + (e.key === 'ArrowRight' ? 2 : -2)))); } }} />}
+                                <div ref={editorPanelRef} className={workspaceStyles.editor}>
                                     {/* Header của SQL Editor */}
-                                    <div className="flex items-center justify-between px-5 py-2.5 bg-slate-50 border-b border-slate-200 shrink-0">
+                                    <div className={workspaceStyles.editorToolbar}>
                                         <div className="flex items-center gap-2">
                                             <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
                                             <span className="text-xs font-mono font-bold text-slate-800">
@@ -628,6 +689,12 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                                                 PostgreSQL / MySQL
                                             </span>
                                         </div>
+                                        <div className={workspaceStyles.editorActions}>
+                                        {isEditorFullscreen && <button type="button" className={workspaceStyles.toolbarButton} onClick={() => setShowReference(v => !v)}>{showReference ? 'Ẩn đề bài & ERD' : 'Hiện đề bài & ERD'}</button>}
+                                        <button type="button" className={workspaceStyles.toolbarButton} aria-label={isEditorFullscreen ? 'Thu nhỏ trình soạn thảo' : 'Toàn màn hình trình soạn thảo'} aria-pressed={isEditorFullscreen}
+                                            onClick={() => { setIsEditorFullscreen(v => !v); setShowReference(false); }}>
+                                            {isEditorFullscreen ? '↙ Thu nhỏ' : '⛶ Toàn màn hình'}
+                                        </button>
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -642,16 +709,19 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                                         >
                                             <span>🔄</span> Đặt lại
                                         </button>
+                                        </div>
                                     </div>
 
                                     {/* Textarea Soạn thảo SQL kèm Cột số dòng */}
-                                    <div className="flex-1 flex bg-white relative overflow-hidden min-h-[220px]">
-                                        <div className="py-3.5 px-3 bg-slate-50/80 border-r border-slate-200 text-right select-none font-mono text-xs text-slate-400 leading-relaxed font-semibold shrink-0">
+                                    <div className={workspaceStyles.code}>
+                                        <div ref={lineNumbersRef} className="overflow-hidden py-3.5 px-3 bg-slate-50/80 border-r border-slate-200 text-right select-none font-mono text-[13px] text-slate-400 leading-relaxed font-semibold shrink-0">
                                             {(currentAnswer || '').split('\n').map((_, i) => (
                                                 <div key={i}>{i + 1}</div>
                                             ))}
                                         </div>
                                         <textarea
+                                            aria-label="Trình soạn thảo SQL"
+                                            onScroll={(e) => { if (lineNumbersRef.current) lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop; }}
                                             disabled={isSubmittingTest}
                                             value={currentAnswer}
                                             onChange={(e) =>
@@ -660,20 +730,24 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                                                     [currentQuestion.id]: e.target.value,
                                                 }))
                                             }
-                                            className="flex-1 p-3.5 bg-white text-slate-900 font-mono text-xs outline-none resize-none leading-relaxed focus:bg-slate-50/30 transition-colors"
+                                            className="min-w-0 flex-1 p-3.5 bg-white text-slate-900 font-mono text-[13px] outline-none resize-none leading-relaxed focus:bg-slate-50/30 transition-colors"
                                             spellCheck={false}
                                             placeholder="-- Viết câu lệnh truy vấn SQL của bạn tại đây..."
                                         />
                                     </div>
 
                                     {/* Khung Kết quả thực thi (Output Table & Action Bar) */}
-                                    <div className="h-80 bg-slate-50/50 border-t border-slate-200 flex flex-col overflow-hidden shrink-0">
-                                        <div className="px-5 py-2.5 bg-slate-100/70 border-b border-slate-200 flex items-center justify-between shrink-0">
+                                    <div role="separator" aria-label="Điều chỉnh độ cao kết quả" aria-orientation="horizontal" aria-valuemin={22} aria-valuemax={65} aria-valuenow={Math.round(outputHeight)} tabIndex={0}
+                                        className={workspaceStyles.rowHandle}
+                                        onPointerDown={(e) => startResize(e, 'row')} onPointerMove={resize} onPointerUp={stopResize} onPointerCancel={stopResize} onLostPointerCapture={stopResize}
+                                        onKeyDown={(e) => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); setOutputHeight(v => Math.max(22, Math.min(65, v + (e.key === 'ArrowUp' ? 2 : -2)))); } }} />
+                                    <div className={workspaceStyles.output}>
+                                        <div className="px-3 py-2.5 bg-slate-100/70 border-b border-slate-200 flex flex-wrap gap-2 items-center justify-between shrink-0">
                                             <span className="text-xs font-mono font-bold text-slate-800 flex items-center gap-1.5">
                                                 <span>📊</span> Kết quả thực thi câu lệnh
                                             </span>
 
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex flex-wrap items-center justify-end gap-2">
                                                 {currentRunResult?.executionTimeMs !== undefined && (
                                                     <span className="text-[10px] font-mono text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
                                                         ⏱ {currentRunResult.executionTimeMs} ms
@@ -711,6 +785,8 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleSaveAnswer(currentAnswer)}
+                                                    title="Lưu đáp án (Ctrl+S hoặc Cmd+S)"
+                                                    aria-keyshortcuts="Control+S Meta+S"
                                                     disabled={isCurrentSaving}
                                                     className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-60"
                                                 >
@@ -723,6 +799,7 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                                                         <>
                                                             <span>💾</span>
                                                             <span>Lưu đáp án</span>
+                                                            <kbd className="ml-1 rounded border border-white/30 px-1 text-[10px] font-normal">Ctrl+S</kbd>
                                                         </>
                                                     )}
                                                 </button>
@@ -730,7 +807,7 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                                         </div>
 
                                         {/* Bảng Dữ liệu Output hoặc Khung báo lỗi SQL */}
-                                        <div className="flex-1 p-4 overflow-auto text-xs font-mono bg-white">
+                                        <div role="region" aria-label="Kết quả truy vấn SQL" tabIndex={0} className={`${workspaceStyles.resultsScroll} p-4 text-xs font-mono bg-white`}>
                                             {currentRunResult?.errorMessage ? (
                                                 <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 space-y-2">
                                                     <div className="flex items-center gap-2 font-bold text-xs text-rose-900 font-sans">
@@ -742,14 +819,14 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                                                     </pre>
                                                 </div>
                                             ) : currentRunResult && currentRunResult.rows && currentRunResult.rows.length > 0 ? (
-                                                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-                                                    <table className="w-full text-left text-slate-800 divide-y divide-slate-200">
+                                                <div className="min-w-full w-max border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                                                    <table className="min-w-full w-max text-left text-slate-800 divide-y divide-slate-200">
                                                         <thead className="bg-slate-50">
                                                             <tr>
                                                                 {currentRunResult.columns.map((col) => (
                                                                     <th
                                                                         key={col}
-                                                                        className="py-2.5 px-3.5 font-bold text-slate-600 text-[11px] uppercase tracking-wider font-mono"
+                                                                        className="whitespace-nowrap py-2.5 px-3.5 font-bold text-slate-600 text-[11px] uppercase tracking-wider font-mono"
                                                                     >
                                                                         {col}
                                                                     </th>
@@ -808,7 +885,7 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                         )
                     ) : null}
                     </div>
-                    {!isLoadingWorkspace && questions.length > 0 && <div className={navigatorStyles.navigation}>
+                    {!isLoadingWorkspace && questions.length > 0 && <div className={`${navigatorStyles.navigation} ${workspaceStyles.questionNavigation}`}>
                         <QuestionNavigator questions={questions} currentIndex={currentQuestionIndex}
                             answered={answeredStatus} flagged={flaggedQuestions}
                             onSelect={setCurrentQuestionIndex} onToggleFlag={toggleFlag} />
