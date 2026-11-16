@@ -32,6 +32,9 @@ function LessonContent() {
     // Accordion sidebar & actions states
     const [openCategory, setOpenCategory] = useState<string>('');
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
+    const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+    const lessonContentRef = useRef<HTMLElement>(null);
+    const pendingSectionRef = useRef<string | null>(null);
     const [isBookmarking, setIsBookmarking] = useState(false);
     const [isCompleting, setIsCompleting] = useState(false);
     const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
@@ -88,6 +91,64 @@ function LessonContent() {
     const firstLessonInCurriculum = curriculum.find((c) => c.lessons && c.lessons.length > 0)?.lessons?.[0];
     const defaultSlug = firstLessonInCurriculum?.slug || firstLessonInCurriculum?.id || '';
     const currentSlug = lessonParam || defaultSlug;
+
+    useEffect(() => {
+        const container = lessonContentRef.current;
+        if (!container || isLoadingLesson) return;
+        const sections = Array.from(container.querySelectorAll<HTMLElement>('section[id]'));
+        pendingSectionRef.current = null;
+        container.scrollTop = 0;
+        setActiveSectionId(sections[0]?.id ?? null);
+        let frame = 0;
+        const updateSection = () => {
+            const top = container.getBoundingClientRect().top + 32;
+            const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 3;
+            const pending = pendingSectionRef.current;
+            if (pending) {
+                const target = sections.find(section => section.id === pending);
+                setActiveSectionId(pending);
+                if (!target || Math.abs(target.getBoundingClientRect().top - (top - 8)) < 3 || atBottom) {
+                    pendingSectionRef.current = null;
+                }
+                return;
+            }
+            const active = atBottom ? sections.at(-1)
+                : sections.filter(section => section.getBoundingClientRect().top <= top).at(-1) ?? sections[0];
+            setActiveSectionId(active?.id ?? null);
+        };
+        const onScroll = () => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(updateSection);
+        };
+        const onManualScroll = () => { pendingSectionRef.current = null; };
+        container.addEventListener('scroll', onScroll, { passive: true });
+        container.addEventListener('wheel', onManualScroll, { passive: true });
+        container.addEventListener('touchstart', onManualScroll, { passive: true });
+        container.addEventListener('pointerdown', onManualScroll);
+        container.addEventListener('keydown', onManualScroll);
+        window.addEventListener('resize', onScroll);
+        return () => {
+            cancelAnimationFrame(frame);
+            container.removeEventListener('scroll', onScroll);
+            container.removeEventListener('wheel', onManualScroll);
+            container.removeEventListener('touchstart', onManualScroll);
+            container.removeEventListener('pointerdown', onManualScroll);
+            container.removeEventListener('keydown', onManualScroll);
+            window.removeEventListener('resize', onScroll);
+        };
+    }, [currentLesson?.id, currentLesson?.sections, isLoadingLesson]);
+
+    const navigateToSection = (id: string) => {
+        const container = lessonContentRef.current;
+        const target = document.getElementById(id);
+        if (!container || !target || !container.contains(target)) return;
+        pendingSectionRef.current = id;
+        setActiveSectionId(id);
+        container.scrollTo({
+            top: container.scrollTop + target.getBoundingClientRect().top - container.getBoundingClientRect().top - 24,
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+        });
+    };
 
     // 3. Fetch Lesson Detail theo slug
     const fetchLessonDetail = useCallback(async (slug: string) => {
@@ -436,7 +497,7 @@ function LessonContent() {
             </aside>
 
             {/* Scrollable Lesson Content */}
-            <main className="flex-1 overflow-y-auto px-6 lg:px-10 py-8 max-w-5xl mx-auto space-y-8">
+            <main ref={lessonContentRef} className="flex-1 overflow-y-auto px-6 lg:px-10 py-8 max-w-5xl mx-auto space-y-8">
                 {isLoadingLesson ? (
                     <div className="space-y-6 animate-pulse py-4">
                         <div className="h-4 bg-slate-200 rounded w-1/3" />
@@ -659,8 +720,13 @@ function LessonContent() {
                                     <a
                                         key={itemId || idx}
                                         href={`#${itemId}`}
+                                        aria-current={activeSectionId === itemId ? 'location' : undefined}
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            navigateToSection(itemId);
+                                        }}
                                         className={`block py-1.5 px-2 rounded-lg transition-colors ${
-                                            idx === 0
+                                            activeSectionId === itemId
                                                 ? 'font-bold text-blue-600 bg-blue-50'
                                                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                                         }`}

@@ -96,6 +96,16 @@ export default function MarkdownRenderer({ content, className = '' }: MarkdownRe
 
     // Phân giải các dòng / block của Markdown
     const lines = content.replace(/\r\n/g, '\n').split('\n');
+    const tableCells = (line: string): string[] => line.trim()
+        .replace(/^\|/, '').replace(/(?<!\\)\|$/, '')
+        .split(/(?<!\\)\|/).map(cell => cell.trim().replace(/\\\|/g, '|'));
+    const isTableStart = (index: number): boolean => {
+        if (index + 1 >= lines.length || !lines[index].includes('|')) return false;
+        const header = tableCells(lines[index]);
+        const separators = tableCells(lines[index + 1]);
+        return header.length >= 1 && header.length === separators.length
+            && separators.every(cell => /^:?-{3,}:?$/.test(cell));
+    };
     const nodes: React.ReactNode[] = [];
     let i = 0;
 
@@ -253,6 +263,46 @@ export default function MarkdownRenderer({ content, className = '' }: MarkdownRe
             continue;
         }
 
+        // SQL result tables can scroll horizontally without widening the lesson.
+        if (isTableStart(i)) {
+            const tableIndex = i;
+            const headers = tableCells(lines[i]);
+            const separators = tableCells(lines[i + 1]);
+            const alignments = separators.map(cell => cell.startsWith(':') && cell.endsWith(':')
+                ? 'center' : cell.endsWith(':') ? 'right' : 'left') as ('left' | 'center' | 'right')[];
+            i += 2;
+            const rows: string[][] = [];
+            while (i < lines.length && lines[i].trim() && lines[i].includes('|')) {
+                rows.push(tableCells(lines[i]));
+                i++;
+            }
+            nodes.push(
+                <div key={`table-${tableIndex}`} className="my-4 max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                    <table className="w-full text-left text-xs sm:text-sm">
+                        <thead className="bg-slate-50 text-slate-700">
+                            <tr>{headers.map((header, column) => (
+                                <th key={column} scope="col" style={{ textAlign: alignments[column] }} className="px-4 py-3 font-semibold whitespace-nowrap border-b border-slate-200">
+                                    {renderInline(header)}
+                                </th>
+                            ))}</tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-600">
+                            {rows.map((row, rowIndex) => (
+                                <tr key={rowIndex} className="even:bg-slate-50/50">
+                                    {headers.map((_, column) => (
+                                        <td key={column} style={{ textAlign: alignments[column] }} className="px-4 py-2.5 align-top">
+                                            {renderInline(row[column] ?? '')}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+            continue;
+        }
+
         // 6. Horizontal Rule (--- or ***)
         if (/^(\-{3,}|\*{3,})$/.test(line.trim())) {
             nodes.push(<hr key={`hr-${i}`} className="my-4 border-slate-200" />);
@@ -271,6 +321,7 @@ export default function MarkdownRenderer({ content, className = '' }: MarkdownRe
         while (
             i < lines.length &&
             lines[i].trim().length > 0 &&
+            !isTableStart(i) &&
             !lines[i].trim().startsWith('```') &&
             !lines[i].match(/^#{1,6}\s+/) &&
             !lines[i].trim().startsWith('>') &&
