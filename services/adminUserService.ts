@@ -45,6 +45,14 @@ const normalizeAdminUser = (raw: any): AdminUser => {
 };
 
 export const adminUserService = {
+    createUser: async (data: { fullName: string; username: string; email: string; password: string; role: string; active: boolean }): Promise<AdminUser> => {
+        const response = await apiClient.post('/api/admin/users', data);
+        return normalizeAdminUser(response.data?.result ?? response.data?.data ?? response.data);
+    },
+    updateUser: async (id: string, data: { fullName: string; username: string; email: string; role: string; active: boolean }): Promise<AdminUser> => {
+        const response = await apiClient.put(`/api/admin/users/${encodeURIComponent(id)}`, data);
+        return normalizeAdminUser(response.data?.result ?? response.data?.data ?? response.data);
+    },
     deleteUser: async (userId: string): Promise<void> => {
         await apiClient.delete(`/api/admin/users/${encodeURIComponent(userId)}`);
     },
