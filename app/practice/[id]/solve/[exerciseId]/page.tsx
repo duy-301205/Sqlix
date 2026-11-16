@@ -833,7 +833,7 @@ export default function SolveExercisePage({ params }: SolvePageProps) {
             </div>
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-                <Header userName="Duy Hoàng" streakCount={7} />
+                <Header userName="Duy Hoàng" />
 
                 {submissionError && (
                     <p role="alert" className="bg-rose-50 px-6 py-2.5 text-xs font-medium text-rose-600 border-b border-rose-200">

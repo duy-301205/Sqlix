@@ -589,15 +589,15 @@ export default function AdminDashboardPage() {
                                         <td className="py-4 px-6 text-center">
                                             <span
                                                 className={`inline-block font-black text-xs px-2.5 py-1 rounded-lg ${
-                                                    session.score >= 8
+                                                    session.score / (session.maxScore || 100) >= 0.8
                                                         ? 'bg-emerald-50 text-emerald-700'
-                                                        : session.score >= 5
+                                                        : session.score / (session.maxScore || 100) >= 0.5
                                                         ? 'bg-amber-50 text-amber-700'
                                                         : 'bg-rose-50 text-rose-700'
                                                 }`}
                                             >
                                                 {typeof session.score === 'number' ? session.score.toFixed(1) : session.score} /{' '}
-                                                {session.maxScore || 10}
+                                                {session.maxScore || 100}
                                             </span>
                                         </td>
 

@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
+import apiClient from '@/services/apiClient';
 import userService, { UserProfile } from '@/services/userService';
 import { requestAttemptExit } from './AttemptLeaveGuard';
 import authService, { checkCanAccessAdmin } from '@/services/authService';
@@ -13,16 +14,58 @@ interface HeaderProps {
     streakCount?: number;
 }
 
+// Preserve short study intervals across page navigation, separately for each account.
+const studyTimeBuffers = new Map<string, { seconds: number; sending: boolean }>();
+
 export default function Header({ 
     userName: defaultUserName = 'Người học', 
     streakCount: defaultStreakCount = 0 
 }: HeaderProps) {
     const router = useRouter();
+    const pathname = usePathname();
     const [user, setUser] = useState<UserProfile | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const hasFetchedRef = useRef(false);
+
+    useEffect(() => {
+        const studying = pathname === '/learning' || /^\/practice\/[^/]+\/solve\//.test(pathname)
+            || /^\/test-sessions\/[^/]+\/workspace/.test(pathname);
+        if (!studying || !user?.id) return;
+        const accountKey = String(user.id);
+        const buffer = studyTimeBuffers.get(accountKey) ?? { seconds: 0, sending: false };
+        studyTimeBuffers.set(accountKey, buffer);
+        let lastTick = performance.now();
+        let mounted = true;
+        const onVisibility = () => { lastTick = performance.now(); };
+        const timer = window.setInterval(async () => {
+            const now = performance.now();
+            const elapsed = Math.min(5, (now - lastTick) / 1000);
+            lastTick = now;
+            if (document.visibilityState !== 'visible' || !document.hasFocus()) return;
+            if (!localStorage.getItem('accessToken') && !localStorage.getItem('refreshToken')) return;
+            buffer.seconds += elapsed;
+            if (buffer.seconds < 30 || buffer.sending) return;
+            buffer.sending = true;
+            const seconds = Math.min(60, Math.floor(buffer.seconds));
+            try {
+                await apiClient.post('/api/dashboard/study-time', { seconds });
+                buffer.seconds -= seconds;
+                const profile = await userService.getCurrentUser(true);
+                if (mounted) setUser(profile);
+            } catch {
+                // Keep unreported time for the next attempt, bounded by one minute.
+                buffer.seconds = Math.min(buffer.seconds, 60);
+            } finally { buffer.sending = false; }
+        }, 1000);
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => {
+            mounted = false;
+            clearInterval(timer);
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
+    }, [pathname, user?.id]);
 
     // Lấy thông tin user hiện tại khi component mount
     useEffect(() => {
@@ -103,7 +146,7 @@ export default function Header({
     };
 
     const displayName = user?.fullName || user?.username || defaultUserName;
-    const displayStreak = user?.streakCount ?? user?.streak ?? defaultStreakCount;
+    const displayStreak = user?.current_streak ?? user?.streakCount ?? user?.streak ?? defaultStreakCount;
     const avatarUrl = user?.avatarUrl || user?.avatar || 'https://lh3.googleusercontent.com/aida-public/AB6AXuA5s5gKn-GLKNAcWX9EFxyoYiTB5P4nSlHOI-1xfIgZeQsJ-r6VomssBqEWxVxf1x6An_7eTmstH3JQg7MKykFsZYIiXmy79nQtx5w5ttWLQIfnSMUTq90KVF2u89D6vK7mBb_dvZwHu_MhOck-Fkp_KdrFxPRZ_xmi6VeVbbXxjdepfIMNmsdpS4AyKZyt6weuqVVp_G3ciu6_0akcgzTF5K2MjVGgLmJYTT81_BgzxZc6cDDdmOla';
     const canAccessAdmin = checkCanAccessAdmin(user?.role);
 

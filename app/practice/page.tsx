@@ -99,7 +99,7 @@ export default function PracticePage() {
 
             {/* Main Content View */}
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-                <Header userName="Duy Hoàng" streakCount={7} />
+                <Header userName="Duy Hoàng" />
 
                 <main className="flex-1 overflow-y-auto px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8">
                     {/* Header & Controls */}

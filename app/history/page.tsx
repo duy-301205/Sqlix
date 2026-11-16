@@ -309,7 +309,7 @@ export default function MockTestHistoryPage() {
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" suppressHydrationWarning>
                 {/* Header */}
-                <Header userName="Duy Hoàng" streakCount={7} />
+                <Header userName="Duy Hoàng" />
 
                 {/* Scrollable Body */}
                 <main className="flex-1 overflow-y-auto px-6 sm:px-8 lg:px-10 py-6 w-full max-w-[1500px] mx-auto space-y-6">

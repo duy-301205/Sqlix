@@ -331,7 +331,7 @@ export default function TestWorkspacePage({ params }: WorkspacePageProps) {
                 message="Nếu thoát, các đáp án đang nhập sẽ được lưu và bài thi sẽ được nộp ngay. Những câu chưa trả lời được tính 0 điểm; phiên thi này sẽ kết thúc." />
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" suppressHydrationWarning>
-                <Header userName="Duy Hoàng" streakCount={7} />
+                <Header userName="Duy Hoàng" />
 
                 {submissionError && <p role="alert" className="bg-rose-50 px-6 py-3 text-sm text-rose-600">{submissionError}</p>}
                 {/* Top Controls Header */}

@@ -115,7 +115,7 @@ export default function TestResultPage({ params }: ResultPageProps) {
             <Sidebar />
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" suppressHydrationWarning>
-                <Header userName="Học viên" streakCount={7} />
+                <Header userName="Học viên" />
 
                 <main className="flex-1 overflow-y-auto px-4 sm:px-8 lg:px-12 py-8 w-full max-w-[1000px] mx-auto space-y-8">
                     {/* Loading State */}
