@@ -1,18 +1,38 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import authService, { checkIsAdmin, extractRoleFromToken } from '@/services/authService';
 import userService from '@/services/userService';
 
-export default function LoginPage() {
+function LoginContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+    const [isUnverified, setIsUnverified] = useState(false);
+
+    useEffect(() => {
+        const paramEmail = searchParams.get('email');
+        if (paramEmail) {
+            setEmail(paramEmail);
+        }
+
+        const isVerified = searchParams.get('verified') === 'true';
+        if (isVerified) {
+            setSuccessMessage('Xác thực tài khoản thành công! Vui lòng đăng nhập để bắt đầu học tập.');
+        }
+
+        const isRegistered = searchParams.get('registered') === 'true';
+        if (isRegistered) {
+            setSuccessMessage('Đăng ký tài khoản thành công! Vui lòng đăng nhập.');
+        }
+    }, [searchParams]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -20,6 +40,7 @@ export default function LoginPage() {
 
         setIsLoading(true);
         setErrorMessage('');
+        setIsUnverified(false);
 
         try {
             const res = await authService.login({
@@ -68,9 +89,13 @@ export default function LoginPage() {
         } catch (err: any) {
             console.error('Login error:', err);
             const data = err.response?.data;
+            const code = data?.code;
             let msg = 'Tên đăng nhập/email hoặc mật khẩu không chính xác!';
 
-            if (data?.message) {
+            if (code === 1011 || (data?.message && data.message.includes('xác minh email'))) {
+                setIsUnverified(true);
+                msg = 'Tài khoản chưa được xác thực email. Vui lòng nhập mã OTP để kích hoạt.';
+            } else if (data?.message) {
                 msg = data.message;
             } else if (data?.errors) {
                 if (Array.isArray(data.errors)) {
@@ -219,13 +244,36 @@ export default function LoginPage() {
                         </p>
                     </div>
 
+                    {/* Success Banner */}
+                    {successMessage && (
+                        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700 animate-in fade-in duration-200">
+                            <svg className="h-4 w-4 shrink-0 mt-0.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span className="flex-1 font-medium">{successMessage}</span>
+                        </div>
+                    )}
+
                     {/* Error Banner */}
                     {errorMessage && (
-                        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 animate-in fade-in duration-200">
-                            <svg className="h-4 w-4 shrink-0 mt-0.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span className="flex-1 font-medium">{errorMessage}</span>
+                        <div className="mb-4 flex flex-col gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 animate-in fade-in duration-200">
+                            <div className="flex items-start gap-2.5">
+                                <svg className="h-4 w-4 shrink-0 mt-0.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="flex-1 font-medium">{errorMessage}</span>
+                            </div>
+                            {isUnverified && (
+                                <Link
+                                    href={`/verify?email=${encodeURIComponent(email.trim())}`}
+                                    className="mt-1 inline-flex items-center justify-center gap-1.5 self-start rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 transition-colors shadow-sm"
+                                >
+                                    <span>Xác thực tài khoản ngay</span>
+                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    </svg>
+                                </Link>
+                            )}
                         </div>
                     )}
 
@@ -366,5 +414,22 @@ export default function LoginPage() {
                 </div>
             </main>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-500 text-sm">
+                    <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                        <span>Đang tải...</span>
+                    </div>
+                </div>
+            }
+        >
+            <LoginContent />
+        </Suspense>
     );
 }

@@ -1,6 +1,9 @@
 import apiClient from './apiClient';
 
 export interface DashboardOverview {
+    totalLessonsCompleted?: number;
+    totalExercisesSolved?: number;
+    totalStudyTimeSeconds?: number;
     completedLessons?: number;
     completed_lessons?: number;
     totalLessons?: number;
@@ -36,6 +39,10 @@ export interface DashboardOverview {
 
     // Kỳ thi thử gần đây
     recentMockTest?: {
+        sessionId: string;
+        submittedAt: string | null;
+        durationSeconds: number;
+        isPassed: boolean;
         id?: string | number;
         title: string;
         date?: string;
@@ -43,7 +50,7 @@ export interface DashboardOverview {
         duration?: string;
         ranking?: string;
         questionCount?: number;
-    };
+    } | null;
 
     [key: string]: any;
 }
@@ -63,6 +70,7 @@ export interface TopicMastery {
 }
 
 export interface DailyActivity {
+    exercisesSolved?: number;
     date: string;
     exerciseCount?: number;
     exercise_count?: number;

@@ -11,7 +11,7 @@ export default function Sidebar() {
     const [canAccessAdmin, setCanAccessAdmin] = useState(false);
 
     useEffect(() => {
-        if (!localStorage.getItem('accessToken')) return;
+        if (!localStorage.getItem('accessToken') && !localStorage.getItem('refreshToken')) return;
         userService.getCurrentUser()
             .then((user) => setCanAccessAdmin(checkCanAccessAdmin(user.role)))
             .catch(() => setCanAccessAdmin(false));
@@ -65,7 +65,7 @@ export default function Sidebar() {
         },
     ];
 
-    return (
+    return (<>
         <aside className="w-64 shrink-0 h-screen bg-white border-r border-slate-200/80 shadow-xs flex flex-col py-6 z-30">
             {/* Brand Logo */}
             <div className="px-6 mb-6 flex items-center gap-3 shrink-0">
@@ -90,6 +90,7 @@ export default function Sidebar() {
                         <Link
                             key={item.name}
                             href={item.href}
+
                             className={`flex items-center gap-3.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
                                 isActive
                                     ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600 shadow-xs'
@@ -106,6 +107,7 @@ export default function Sidebar() {
                 <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-1">
                     {canAccessAdmin && <Link
                         href="/admin/dashboard"
+
                         className="flex items-center gap-3.5 text-blue-600 bg-blue-50/80 hover:bg-blue-100 text-blue-700 rounded-xl px-4 py-2.5 text-sm font-bold transition-all border border-blue-200/70 shadow-2xs group"
                     >
                         <svg className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -115,6 +117,7 @@ export default function Sidebar() {
                     </Link>}
                     <Link
                         href="/dashboard/settings"
+
                         className="flex items-center gap-3.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -125,6 +128,7 @@ export default function Sidebar() {
                     </Link>
                     <Link
                         href="/login"
+
                         className="flex items-center gap-3.5 text-rose-600 hover:bg-rose-50 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,5 +154,5 @@ export default function Sidebar() {
                 </div>
             </div>
         </aside>
-    );
+    </>);
 }

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { DatabaseDetail, TableSchema, DATABASES_DETAIL } from '../data';
+import { Crosshair, Move } from 'lucide-react';
 
 interface ErdTabProps {
     dbData?: DatabaseDetail | any;
@@ -130,6 +131,17 @@ const COLOR_SCHEMES = [
 
 export default function ErdTab({ dbData, schemaData, compact = false, diagramOnly = false }: ErdTabProps) {
     const [zoomLevel, setZoomLevel] = useState<number>(100);
+    const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const [isPanning, setIsPanning] = useState(false);
+
+    const containerRef = useRef<HTMLDivElement>(null);
+    const panStartRef = useRef<{ startX: number; startY: number; initialPanX: number; initialPanY: number }>({
+        startX: 0,
+        startY: 0,
+        initialPanX: 0,
+        initialPanY: 0,
+    });
+    const hasAutoCenteredRef = useRef(false);
 
     const currentDb = dbData || DATABASES_DETAIL.ecommerce;
     const tablesList = (schemaData && schemaData.tables && schemaData.tables.length > 0)
@@ -175,20 +187,192 @@ export default function ErdTab({ dbData, schemaData, compact = false, diagramOnl
         };
     };
 
-    const canvasBounds = useMemo(() => {
-        let maxRight = 735;
-        let maxBottom = 480;
+    // Tính toán giới hạn tọa độ của sơ đồ (Bounding Box)
+    const diagramBounds = useMemo(() => {
+        if (!tablesList || tablesList.length === 0) {
+            return { minX: 0, minY: 0, maxX: 735, maxY: 480, width: 735, height: 480, centerX: 367.5, centerY: 240 };
+        }
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
 
         tablesList.forEach((t: any, idx: number) => {
             const pos = getTableLayout(t, idx);
             const w = pos.width || 220;
             const h = 40 + (t.columns?.length || 4) * 26 + 10;
-            if (pos.left + w > maxRight) maxRight = pos.left + w + 30;
-            if (pos.top + h > maxBottom) maxBottom = pos.top + h + 30;
+            minX = Math.min(minX, pos.left);
+            minY = Math.min(minY, pos.top);
+            maxX = Math.max(maxX, pos.left + w);
+            maxY = Math.max(maxY, pos.top + h);
         });
 
-        return { width: Math.max(735, maxRight), height: Math.max(480, maxBottom) };
+        const width = Math.max(100, maxX - minX);
+        const height = Math.max(100, maxY - minY);
+        return {
+            minX,
+            minY,
+            maxX,
+            maxY,
+            width,
+            height,
+            centerX: (minX + maxX) / 2,
+            centerY: (minY + maxY) / 2,
+        };
     }, [tablesList, dbLayout]);
+
+    // Canvas kích thước bao quanh đảm bảo đủ không gian vẽ dây SVG
+    const canvasBounds = useMemo(() => {
+        return {
+            width: Math.max(750, diagramBounds.maxX + 40),
+            height: Math.max(500, diagramBounds.maxY + 40),
+        };
+    }, [diagramBounds]);
+
+    // Hàm tự động căn giữa sơ đồ vào chính giữa container
+    const recenter = useCallback((overrideZoom?: number) => {
+        if (!containerRef.current) return;
+        const container = containerRef.current;
+        const cw = container.clientWidth;
+        const ch = container.clientHeight;
+        if (cw <= 0 || ch <= 0) return;
+
+        const bounds = diagramBounds;
+        const padding = 24;
+        const availW = Math.max(60, cw - padding * 2);
+        const availH = Math.max(60, ch - padding * 2);
+
+        // Tỷ lệ vừa vặn với kích thước khung chứa
+        const fitScale = Math.min(availW / bounds.width, availH / bounds.height);
+        // Zoom mục tiêu: nếu sơ đồ to thì co lại để thấy hết, tối đa 100%, tối thiểu 45%
+        const targetZoom = overrideZoom ?? Math.round(Math.max(45, Math.min(100, fitScale * 100)));
+        const scale = targetZoom / 100;
+
+        // Tọa độ đặt trọng tâm sơ đồ vào chính giữa container
+        const initialPanX = cw / 2 - bounds.centerX * scale;
+        const initialPanY = ch / 2 - bounds.centerY * scale;
+
+        setZoomLevel(targetZoom);
+        setPan({ x: initialPanX, y: initialPanY });
+    }, [diagramBounds]);
+
+    // Khi nạp trang hoặc schema thay đổi, tự động căn giữa luôn đầu tiên
+    useEffect(() => {
+        hasAutoCenteredRef.current = false;
+        const timer = setTimeout(() => {
+            recenter();
+            hasAutoCenteredRef.current = true;
+        }, 60);
+
+        if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+            const observer = new ResizeObserver(() => {
+                if (!hasAutoCenteredRef.current) {
+                    recenter();
+                    hasAutoCenteredRef.current = true;
+                }
+            });
+            observer.observe(containerRef.current);
+            return () => {
+                clearTimeout(timer);
+                observer.disconnect();
+            };
+        }
+        return () => clearTimeout(timer);
+    }, [recenter]);
+
+    // Xử lý kéo thả chuột (Pan / dịch chuyển trái, phải, lên, xuống tự do)
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (e.button !== 0) return;
+        const target = e.target as HTMLElement;
+        if (target.closest('button')) return;
+
+        setIsPanning(true);
+        panStartRef.current = {
+            startX: e.clientX,
+            startY: e.clientY,
+            initialPanX: pan.x,
+            initialPanY: pan.y,
+        };
+
+        const onMouseMove = (moveEvent: MouseEvent) => {
+            const deltaX = moveEvent.clientX - panStartRef.current.startX;
+            const deltaY = moveEvent.clientY - panStartRef.current.startY;
+            setPan({
+                x: panStartRef.current.initialPanX + deltaX,
+                y: panStartRef.current.initialPanY + deltaY,
+            });
+        };
+
+        const onMouseUp = () => {
+            setIsPanning(false);
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+    };
+
+    // Phóng to về phía tâm container
+    const handleZoomIn = () => {
+        setZoomLevel((prev) => {
+            const next = Math.min(prev + 10, 160);
+            if (containerRef.current) {
+                const cw = containerRef.current.clientWidth;
+                const ch = containerRef.current.clientHeight;
+                const ratio = (next / 100) / (prev / 100);
+                setPan((p) => ({
+                    x: cw / 2 - (cw / 2 - p.x) * ratio,
+                    y: ch / 2 - (ch / 2 - p.y) * ratio,
+                }));
+            }
+            return next;
+        });
+    };
+
+    // Thu nhỏ về phía tâm container
+    const handleZoomOut = () => {
+        setZoomLevel((prev) => {
+            const next = Math.max(prev - 10, 35);
+            if (containerRef.current) {
+                const cw = containerRef.current.clientWidth;
+                const ch = containerRef.current.clientHeight;
+                const ratio = (next / 100) / (prev / 100);
+                setPan((p) => ({
+                    x: cw / 2 - (cw / 2 - p.x) * ratio,
+                    y: ch / 2 - (ch / 2 - p.y) * ratio,
+                }));
+            }
+            return next;
+        });
+    };
+
+    // Cuộn chuột để phóng to/thu nhỏ (Ctrl+Wheel) hoặc di chuyển pan
+    const handleWheel = (e: React.WheelEvent) => {
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+            const delta = e.deltaY < 0 ? 8 : -8;
+            setZoomLevel((prev) => {
+                const next = Math.max(35, Math.min(160, prev + delta));
+                if (containerRef.current) {
+                    const rect = containerRef.current.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+                    const ratio = (next / 100) / (prev / 100);
+                    setPan((p) => ({
+                        x: mouseX - (mouseX - p.x) * ratio,
+                        y: mouseY - (mouseY - p.y) * ratio,
+                    }));
+                }
+                return next;
+            });
+        } else {
+            setPan((p) => ({
+                x: p.x - e.deltaX,
+                y: p.y - e.deltaY,
+            }));
+        }
+    };
 
     // Trích xuất toàn bộ quan hệ (từ schemaData hoặc suy đoán từ cột có isFk)
     interface ParsedRelation {
@@ -238,7 +422,6 @@ export default function ErdTab({ dbData, schemaData, compact = false, diagramOnl
             }
         }
 
-        // Bổ sung tự động suy đoán từ cột có isFk hoặc đuôi _id
         for (const t of tablesList) {
             const cols = t.columns || [];
             for (const c of cols) {
@@ -331,42 +514,63 @@ export default function ErdTab({ dbData, schemaData, compact = false, diagramOnl
                 </div>
             )}
 
-            {/* Vùng Canvas ERD */}
+            {/* Vùng Canvas ERD với khả năng Pan & Zoom & Tự động Căn giữa */}
             <div
                 style={{ height: compact || diagramOnly ? 480 : 520, minHeight: compact || diagramOnly ? 480 : 520 }}
                 className="flex-1 w-full bg-white rounded-2xl border border-slate-200 shadow-xs relative overflow-hidden flex flex-col shrink-0"
             >
-                {/* Thanh công cụ Zoom */}
+                {/* Thanh công cụ Zoom & Căn giữa */}
                 <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5 bg-white/95 backdrop-blur-xs p-1 rounded-xl border border-slate-200 shadow-xs">
                     <button
                         type="button"
-                        onClick={() => setZoomLevel((prev) => Math.min(prev + 10, 140))}
+                        onClick={handleZoomIn}
                         className="w-7 h-7 bg-white hover:bg-slate-100 rounded-lg text-slate-700 flex items-center justify-center shadow-xs cursor-pointer text-sm font-bold"
-                        title="Phóng to"
+                        title="Phóng to (+)"
                     >
                         +
                     </button>
                     <button
                         type="button"
-                        onClick={() => setZoomLevel((prev) => Math.max(prev - 10, 50))}
+                        onClick={handleZoomOut}
                         className="w-7 h-7 bg-white hover:bg-slate-100 rounded-lg text-slate-700 flex items-center justify-center shadow-xs cursor-pointer text-sm font-bold"
-                        title="Thu nhỏ"
+                        title="Thu nhỏ (-)"
                     >
                         -
                     </button>
                     <button
                         type="button"
-                        onClick={() => setZoomLevel(100)}
-                        className="px-2 py-1 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
-                        title="Mặc định 100%"
+                        onClick={() => recenter()}
+                        className="px-2 py-1 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer flex items-center gap-1"
+                        title="Căn giữa sơ đồ và vừa vặn khung hình"
                     >
-                        {zoomLevel}%
+                        <Crosshair className="w-3.5 h-3.5 text-blue-600" />
+                        <span>{zoomLevel}%</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => recenter()}
+                        className="px-2 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer border border-blue-200"
+                        title="Đưa toàn bộ sơ đồ về chính giữa"
+                    >
+                        Căn giữa
                     </button>
                 </div>
 
-                {/* Khung vẽ Canvas căn giữa */}
+                {/* Gợi ý điều hướng ở góc dưới bên trái */}
+                <div className="absolute bottom-2.5 left-3 z-20 pointer-events-none select-none text-[10px] font-medium text-slate-400 bg-white/85 backdrop-blur-xs px-2.5 py-1 rounded-lg border border-slate-200/80 shadow-2xs flex items-center gap-1.5">
+                    <Move className="w-3 h-3 text-slate-400" />
+                    <span>Kéo chuột để di chuyển • Cuộn để di chuyển • Nhấp đúp để căn giữa</span>
+                </div>
+
+                {/* Khung vẽ Canvas ERD (Tự do Pan & Zoom, không bị cắt lề trái) */}
                 <div
-                    className="w-full h-full relative overflow-auto p-4 flex items-center justify-center"
+                    ref={containerRef}
+                    onMouseDown={handleMouseDown}
+                    onDoubleClick={() => recenter()}
+                    onWheel={handleWheel}
+                    className={`w-full h-full relative overflow-hidden select-none ${
+                        isPanning ? 'cursor-grabbing' : 'cursor-grab'
+                    }`}
                     style={{
                         backgroundImage: 'radial-gradient(circle, #cbd5e1 1.2px, transparent 1.2px)',
                         backgroundSize: '22px 22px',
@@ -377,10 +581,12 @@ export default function ErdTab({ dbData, schemaData, compact = false, diagramOnl
                         style={{
                             width: canvasBounds.width,
                             height: canvasBounds.height,
-                            transform: `scale(${zoomLevel / 100})`,
-                            transformOrigin: 'center center',
+                            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel / 100})`,
+                            transformOrigin: '0 0',
                         }}
-                        className="relative shrink-0 transition-transform duration-200 my-auto"
+                        className={`absolute top-0 left-0 ${
+                            isPanning ? '' : 'transition-transform duration-100 ease-out'
+                        }`}
                     >
                         {/* ================= SVG DÂY NỐI ================= */}
                         <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" overflow="visible">

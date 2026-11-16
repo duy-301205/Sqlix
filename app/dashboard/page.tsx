@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
+import ActivityChart from './ActivityChart';
 import dashboardService, {
     DashboardOverview,
     TopicMastery,
@@ -30,10 +31,11 @@ export default function DashboardPage() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const hasFetchedRef = useRef(false);
+    const requestRef = useRef(0);
 
-    const fetchDashboardData = async () => {
-        setIsLoading(true);
+    const fetchDashboardData = useCallback(async (silent = false) => {
+        const requestId = ++requestRef.current;
+        if (!silent) setIsLoading(true);
         setErrorMessage(null);
 
         try {
@@ -44,6 +46,7 @@ export default function DashboardPage() {
                 dashboardService.getActivityChart(),
                 dashboardService.getRecentActivities(),
             ]);
+            if (requestId !== requestRef.current) return;
 
             if (overviewRes.status === 'fulfilled') setOverview(overviewRes.value);
             if (masteryRes.status === 'fulfilled') setMastery(masteryRes.value);
@@ -64,96 +67,55 @@ export default function DashboardPage() {
                 setErrorMessage(code ? `[Lỗi ${code}] ${backendMsg}` : backendMsg);
             }
         } catch (err: any) {
+            if (requestId !== requestRef.current) return;
             console.error('Lỗi khi tải dữ liệu dashboard:', err);
             setErrorMessage('Có lỗi xảy ra khi tải dữ liệu bảng điều khiển.');
         } finally {
-            setIsLoading(false);
+            if (requestId === requestRef.current) setIsLoading(false);
         }
-    };
-
-    useEffect(() => {
-        // Tránh gọi lặp 2 lần do React StrictMode trong môi trường Development
-        if (hasFetchedRef.current) return;
-        hasFetchedRef.current = true;
-
-        fetchDashboardData();
     }, []);
 
+    useEffect(() => {
+        void fetchDashboardData();
+        const refresh = () => {
+            if (document.visibilityState === 'visible') void fetchDashboardData(true);
+        };
+        window.addEventListener('focus', refresh);
+        window.addEventListener('pageshow', refresh);
+        document.addEventListener('visibilitychange', refresh);
+        return () => {
+            ++requestRef.current;
+            window.removeEventListener('focus', refresh);
+            window.removeEventListener('pageshow', refresh);
+            document.removeEventListener('visibilitychange', refresh);
+        };
+    }, [fetchDashboardData]);
+
     // 1. Số liệu tổng quan (với fallback tính toán an toàn)
-    const completedLessons = overview?.completedLessons ?? overview?.completed_lessons ?? 0;
-    const totalLessons = overview?.totalLessons ?? overview?.total_lessons ?? 120;
+    const completedLessons = overview?.totalLessonsCompleted ?? 0;
+    const totalLessons = overview?.totalLessons ?? 0;
     const lessonPercent =
         overview?.lessonPercentage ??
         (totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0);
     const remainingLessons = Math.max(0, totalLessons - completedLessons);
 
-    const completedExercises = overview?.completedExercises ?? overview?.completed_exercises ?? 0;
-    const totalExercises = overview?.totalExercises ?? overview?.total_exercises ?? 300;
+    const completedExercises = overview?.totalExercisesSolved ?? 0;
+    const totalExercises = overview?.totalExercises ?? 0;
     const exercisePercent =
         overview?.exercisePercentage ??
         (totalExercises > 0 ? Math.round((completedExercises / totalExercises) * 100) : 0);
 
     const averageScore = overview?.averageScore ?? overview?.average_score ?? 0;
-    const rankingTier = overview?.rankingTier ?? overview?.ranking_tier ?? 'Đang xếp hạng';
-    const rankingPercentile = overview?.rankingPercentile ?? 'Top học viên tích cực';
+    const rankingTier = 'Bài thực hành và thi thử';
+    const rankingPercentile = 'Thang 100';
 
-    const studyTimeHours = overview?.studyTimeHours ?? overview?.study_time_hours ?? 0;
+    const studyTimeHours = (overview?.totalStudyTimeSeconds ?? 0) / 3600;
     const dailyAverageMinutes = overview?.dailyAverageMinutes ?? overview?.daily_average_minutes ?? 0;
-
-    // 2. Tính toán đường biểu đồ SVG từ chartData
-    const renderChartPaths = () => {
-        if (!chartData || chartData.length === 0) {
-            // Placeholder đường sóng mặc định nếu chưa có dữ liệu 30 ngày
-            return {
-                exercisesPath: 'M 0,160 Q 70,120 150,110 T 300,50 T 400,130 T 500,90',
-                scoresPath: 'M 0,120 Q 70,140 150,80 T 300,80 T 400,96 T 500,56',
-                gradientPath: 'M 0,160 Q 70,120 150,110 T 300,50 T 400,130 T 500,90 L 500,200 L 0,200 Z',
-                dateLabels: ['1', '5', '10', '15', '20', '25', '30'],
-            };
-        }
-
-        const width = 500;
-        const height = 180;
-        const n = chartData.length;
-        const stepX = width / Math.max(1, n - 1);
-
-        // Max bài tập để scale
-        const maxEx = Math.max(...chartData.map((d) => d.exerciseCount ?? d.exercise_count ?? d.exercises ?? 0), 10);
-
-        const exPoints = chartData.map((d, i) => {
-            const val = d.exerciseCount ?? d.exercise_count ?? d.exercises ?? 0;
-            const x = Math.round(i * stepX);
-            const y = Math.round(height - (val / maxEx) * (height - 30));
-            return `${x},${y}`;
-        });
-
-        const scorePoints = chartData.map((d, i) => {
-            const score = d.averageScore ?? d.average_score ?? d.score ?? 0; // thang 10
-            const x = Math.round(i * stepX);
-            const y = Math.round(height - (score / 10) * (height - 30));
-            return `${x},${y}`;
-        });
-
-        const exercisesPath = `M ${exPoints.join(' L ')}`;
-        const scoresPath = `M ${scorePoints.join(' L ')}`;
-        const gradientPath = `M ${exPoints.join(' L ')} L ${width},${height} L 0,${height} Z`;
-
-        // Lấy 7 mốc ngày đại diện
-        const step = Math.max(1, Math.floor(n / 6));
-        const dateLabels = chartData
-            .filter((_, idx) => idx % step === 0 || idx === n - 1)
-            .slice(0, 7)
-            .map((d) => d.date?.slice(-5) || d.date || '');
-
-        return { exercisesPath, scoresPath, gradientPath, dateLabels };
-    };
-
-    const chartRender = renderChartPaths();
 
     return (
         <div className="flex h-screen w-full bg-[#f1f5f9] text-slate-800 antialiased overflow-hidden font-sans">
             {/* Sidebar Component */}
-            <Sidebar />
+            <div className="hidden md:block shrink-0"><Sidebar /></div>
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
@@ -161,7 +123,7 @@ export default function DashboardPage() {
                 <Header />
 
                 {/* Scrollable Dashboard Body */}
-                <main className="flex-1 overflow-y-auto px-6 sm:px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8">
+                <main className="flex-1 min-w-0 overflow-y-auto px-4 sm:px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8">
                     {/* Error Banner */}
                     {errorMessage && (
                         <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm font-semibold flex items-center justify-between shadow-xs">
@@ -172,7 +134,7 @@ export default function DashboardPage() {
                                 <span>{errorMessage}</span>
                             </div>
                             <button
-                                onClick={fetchDashboardData}
+                                onClick={() => void fetchDashboardData()}
                                 className="px-3 py-1 bg-white border border-rose-300 rounded-lg text-rose-700 hover:bg-rose-100 text-xs font-bold cursor-pointer transition-all"
                             >
                                 Thử lại
@@ -274,12 +236,12 @@ export default function DashboardPage() {
                                             <span className="text-3xl font-black text-slate-950">
                                                 {typeof averageScore === 'number' ? averageScore.toFixed(1) : averageScore}
                                             </span>
-                                            <span className="text-sm font-semibold text-slate-500">/ 10</span>
+                                            <span className="text-sm font-semibold text-slate-500">/ 100</span>
                                         </div>
                                         <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-3">
                                             <div
                                                 className="bg-purple-600 h-full rounded-full transition-all duration-500"
-                                                style={{ width: `${Math.min(100, (Number(averageScore) / 10) * 100)}%` }}
+                                                style={{ width: `${Math.max(0, Math.min(100, Number(averageScore)))}%` }}
                                             />
                                         </div>
                                     </div>
@@ -368,70 +330,18 @@ export default function DashboardPage() {
                                 </div>
 
                                 {/* Activity Analytics Card (7 Cols) */}
-                                <div className="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+                                <div className="lg:col-span-7 min-w-0 overflow-hidden bg-white rounded-2xl p-4 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between">
                                     <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100">
                                         <div>
                                             <h3 className="font-black text-slate-900 text-lg">Thống kê hoạt động</h3>
-                                            <p className="text-xs text-slate-500 mt-0.5">Tương quan giữa số bài tập và điểm số</p>
+                                            <p className="text-xs text-slate-500 mt-0.5">Lượt nộp bài thực hành và đề thi thử đã hoàn thành</p>
                                         </div>
                                         <div className="px-3.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700">
                                             30 ngày gần nhất
                                         </div>
                                     </div>
 
-                                    {/* Legend */}
-                                    <div className="flex items-center gap-6 mb-4 px-2">
-                                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                                            <span className="w-3 h-3 rounded-full bg-blue-600 inline-block"></span>
-                                            Số bài tập đã làm
-                                        </div>
-                                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                                            <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
-                                            Điểm trung bình (thang 10)
-                                        </div>
-                                    </div>
-
-                                    {/* Crisp Dynamic SVG Line Chart */}
-                                    <div className="w-full h-64 relative">
-                                        <div className="absolute inset-0 flex flex-col justify-between text-[11px] text-slate-400">
-                                            {[40, 30, 20, 10, 0].map((val) => (
-                                                <div key={val} className="w-full border-t border-dashed border-slate-200 flex justify-between relative">
-                                                    <span className="absolute -left-6 -top-2">{val}</span>
-                                                    <span className="absolute -right-6 -top-2">{val / 4}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        <svg className="absolute inset-0 w-full h-full pb-6 px-6" preserveAspectRatio="none" viewBox="0 0 500 180">
-                                            <defs>
-                                                <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#2563eb" stopOpacity="0.25" />
-                                                    <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
-                                                </linearGradient>
-                                            </defs>
-                                            <path d={chartRender.gradientPath} fill="url(#blueGrad)" />
-                                            <path
-                                                d={chartRender.exercisesPath}
-                                                fill="none"
-                                                stroke="#2563eb"
-                                                strokeWidth="3"
-                                                strokeLinecap="round"
-                                            />
-                                            <path
-                                                d={chartRender.scoresPath}
-                                                fill="none"
-                                                stroke="#10b981"
-                                                strokeWidth="3"
-                                                strokeLinecap="round"
-                                            />
-                                        </svg>
-
-                                        <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[11px] font-semibold text-slate-400 px-6">
-                                            {chartRender.dateLabels.map((label, idx) => (
-                                                <span key={idx}>{label}</span>
-                                            ))}
-                                        </div>
-                                    </div>
+                                    <ActivityChart data={chartData} />
                                 </div>
                             </div>
 
@@ -531,54 +441,42 @@ export default function DashboardPage() {
                                 <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between">
                                     <div className="flex justify-between items-center mb-4">
                                         <h3 className="font-black text-slate-900 text-base">Kỳ thi thử gần đây</h3>
-                                        <Link className="text-xs font-bold text-blue-600 hover:underline" href="/mock-test">
+                                        <Link className="text-xs font-bold text-blue-600 hover:underline" href="/history">
                                             Lịch sử thi →
                                         </Link>
                                     </div>
 
-                                    <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 flex flex-col justify-between flex-1">
-                                        <div>
-                                            <div className="flex justify-between items-center mb-1">
-                                                <h4 className="font-bold text-slate-900 text-sm">
-                                                    {overview?.recentMockTest?.title || 'SQL Mock Exam #01'}
-                                                </h4>
-                                                <span className="text-[11px] font-semibold text-slate-400">
-                                                    {overview?.recentMockTest?.date || 'Hôm nay'}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-slate-500 mb-4">
-                                                {overview?.recentMockTest?.questionCount ?? 20} câu hỏi trắc nghiệm & thực hành • 30 phút
-                                            </p>
-
-                                            <div className="grid grid-cols-3 gap-3 mb-4 text-center">
-                                                <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
-                                                    <span className="text-[10px] font-semibold text-slate-400 uppercase">Điểm</span>
-                                                    <div className="text-base font-black text-blue-600 mt-0.5">
-                                                        {overview?.recentMockTest?.score ?? '8.5'}
+                                    {overview?.recentMockTest ? (
+                                        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 flex flex-col justify-between flex-1">
+                                            <div>
+                                                <h4 className="font-bold text-slate-900 text-sm">{overview.recentMockTest.title}</h4>
+                                                <p className="mt-1 text-xs text-slate-500">
+                                                    {overview.recentMockTest.submittedAt ? new Date(overview.recentMockTest.submittedAt).toLocaleString('vi-VN') : 'Chưa có thời gian nộp'}
+                                                    {' • '}{overview.recentMockTest.questionCount} câu hỏi
+                                                </p>
+                                                <div className="grid grid-cols-3 gap-2 my-4 text-center">
+                                                    <div className="rounded-xl border border-slate-200 bg-white p-2">
+                                                        <span className="text-[10px] text-slate-500">Điểm / 100</span>
+                                                        <p className="mt-1 text-lg font-black text-blue-600">{Number(overview.recentMockTest.score).toFixed(1)}</p>
                                                     </div>
-                                                </div>
-                                                <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
-                                                    <span className="text-[10px] font-semibold text-slate-400 uppercase">Thời gian</span>
-                                                    <div className="text-base font-black text-slate-800 mt-0.5">
-                                                        {overview?.recentMockTest?.duration ?? '25:30'}
+                                                    <div className="rounded-xl border border-slate-200 bg-white p-2">
+                                                        <span className="text-[10px] text-slate-500">Thời gian</span>
+                                                        <p className="mt-1 text-sm font-bold">{Math.floor(overview.recentMockTest.durationSeconds / 60)}p {overview.recentMockTest.durationSeconds % 60}s</p>
                                                     </div>
-                                                </div>
-                                                <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
-                                                    <span className="text-[10px] font-semibold text-slate-400 uppercase">Xếp hạng</span>
-                                                    <div className="text-base font-black text-emerald-600 mt-0.5">
-                                                        {overview?.recentMockTest?.ranking ?? 'Top 25%'}
+                                                    <div className="rounded-xl border border-slate-200 bg-white p-2">
+                                                        <span className="text-[10px] text-slate-500">Kết quả</span>
+                                                        <p className={'mt-1 text-sm font-bold ' + (overview.recentMockTest.isPassed ? 'text-emerald-600' : 'text-rose-600')}>{overview.recentMockTest.isPassed ? 'Đạt' : 'Chưa đạt'}</p>
                                                     </div>
                                                 </div>
                                             </div>
+                                            <Link href={'/test-sessions/' + overview.recentMockTest.sessionId + '/result'} className="block rounded-xl border border-slate-300 bg-white py-2.5 text-center text-xs font-bold hover:bg-slate-100">Xem chi tiết kỳ thi</Link>
                                         </div>
-
-                                        <Link
-                                            href="/mock-test"
-                                            className="w-full py-2.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 text-xs font-bold transition-all shadow-xs cursor-pointer block text-center"
-                                        >
-                                            Xem chi tiết kỳ thi
-                                        </Link>
-                                    </div>
+                                    ) : (
+                                        <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+                                            <p className="text-sm font-semibold text-slate-600">Chưa có kỳ thi thử nào hoàn thành</p>
+                                            <Link href="/mock-tests" className="mt-4 text-xs font-bold text-blue-600 hover:underline">Khám phá đề thi →</Link>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </>
