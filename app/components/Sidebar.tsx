@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { SidebarShell } from './SidebarControls';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import userService from '@/services/userService';
@@ -66,7 +67,7 @@ export default function Sidebar() {
     ];
 
     return (<>
-        <aside className="w-64 shrink-0 h-screen bg-white border-r border-slate-200/80 shadow-xs flex flex-col py-6 z-30">
+        <SidebarShell className="w-64 shrink-0 h-screen bg-white border-r border-slate-200/80 shadow-xs flex flex-col py-6">
             {/* Brand Logo */}
             <div className="px-6 mb-6 flex items-center gap-3 shrink-0">
                 <Link className="flex items-center gap-3" href="/">
@@ -153,6 +154,6 @@ export default function Sidebar() {
                     </div>
                 </div>
             </div>
-        </aside>
+        </SidebarShell>
     </>);
 }

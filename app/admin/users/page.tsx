@@ -309,7 +309,8 @@ export default function AdminUsersPage() {
     const hasActiveFilters = searchQuery !== '' || roleFilter !== 'ALL' || statusFilter !== 'ALL';
 
     return (
-        <main className="flex-1 overflow-y-auto px-6 sm:px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-6 min-w-0 font-sans">
+        <main className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto">
+            <div className="px-6 sm:px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-6 font-sans">
             {/* ================= 1. Top Action Bar ================= */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
@@ -927,6 +928,7 @@ export default function AdminUsersPage() {
                     </div>
                 </div>
             )}
+        </div>
         </main>
     );
 }

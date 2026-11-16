@@ -118,7 +118,8 @@ export default function TestResultPage({ params }: ResultPageProps) {
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" suppressHydrationWarning>
                 <Header userName="Học viên" />
 
-                <main className="flex-1 overflow-y-auto px-4 sm:px-8 lg:px-12 py-8 w-full max-w-[1000px] mx-auto space-y-8">
+                <main className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto">
+                    <div className="px-4 sm:px-8 lg:px-12 py-8 w-full max-w-[1000px] mx-auto space-y-8">
                     {/* Loading State */}
                     {isLoading ? (
                         <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-xs text-center space-y-4">
@@ -405,6 +406,7 @@ export default function TestResultPage({ params }: ResultPageProps) {
                             )}
                         </>
                     )}
+                </div>
                 </main>
             </div>
         </div>

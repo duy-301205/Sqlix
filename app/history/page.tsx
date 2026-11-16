@@ -313,7 +313,8 @@ export default function MockTestHistoryPage() {
                 <Header userName="Duy Hoàng" />
 
                 {/* Scrollable Body */}
-                <main className="flex-1 overflow-y-auto px-6 sm:px-8 lg:px-10 py-6 w-full max-w-[1500px] mx-auto space-y-6">
+                <main className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto">
+                    <div className="px-6 sm:px-8 lg:px-10 py-6 w-full max-w-[1500px] mx-auto space-y-6">
                     {/* Header Trang */}
                     <div>
                         <div className="flex items-center gap-2.5">
@@ -891,6 +892,7 @@ export default function MockTestHistoryPage() {
                             </div>
                         )}
                     </div>
+                </div>
                 </main>
             </div>
 

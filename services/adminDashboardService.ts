@@ -160,11 +160,7 @@ export const adminDashboardService = {
                 totalMockTests: isNaN(totalMockTests) ? 0 : totalMockTests,
                 totalQuestions: isNaN(totalQuestions) ? 0 : totalQuestions,
                 totalTestSessions: data?.totalTestSessions ?? data?.totalMockTestSessions ?? 0,
-                passRatePercent:
-                    data?.passRatePercent ??
-                    (data?.totalMockTestSessions > 0
-                        ? Math.round((data?.completedMockTestSessions / data?.totalMockTestSessions) * 100)
-                        : 0),
+                passRatePercent: data?.passRatePercent ?? 0,
                 averageTestScore: data?.averageTestScore ?? 0,
                 systemHealth: data?.systemHealth || {
                     dbStatus: 'HEALTHY',

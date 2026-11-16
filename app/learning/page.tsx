@@ -497,7 +497,8 @@ function LessonContent() {
             </aside>
 
             {/* Scrollable Lesson Content */}
-            <main ref={lessonContentRef} className="flex-1 overflow-y-auto px-6 lg:px-10 py-8 max-w-5xl mx-auto space-y-8">
+            <main ref={lessonContentRef} className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto">
+                    <div className="px-6 lg:px-10 py-8 max-w-5xl mx-auto space-y-8 w-full">
                 {isLoadingLesson ? (
                     <div className="space-y-6 animate-pulse py-4">
                         <div className="h-4 bg-slate-200 rounded w-1/3" />
@@ -702,7 +703,8 @@ function LessonContent() {
                         </p>
                     </div>
                 )}
-            </main>
+            </div>
+                </main>
 
             {/* Right Floating TOC / Actions */}
             <aside className="w-72 border-l border-slate-200 bg-white hidden lg:flex flex-col p-6 overflow-y-auto shrink-0 gap-6">

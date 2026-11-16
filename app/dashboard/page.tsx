@@ -115,7 +115,7 @@ export default function DashboardPage() {
     return (
         <div className="flex h-screen w-full bg-[#f1f5f9] text-slate-800 antialiased overflow-hidden font-sans">
             {/* Sidebar Component */}
-            <div className="hidden md:block shrink-0"><Sidebar /></div>
+            <div className="shrink-0"><Sidebar /></div>
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
@@ -123,7 +123,8 @@ export default function DashboardPage() {
                 <Header />
 
                 {/* Scrollable Dashboard Body */}
-                <main className="flex-1 min-w-0 overflow-y-auto px-4 sm:px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8">
+                <main className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto">
+                    <div className="px-4 sm:px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8">
                     {/* Error Banner */}
                     {errorMessage && (
                         <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm font-semibold flex items-center justify-between shadow-xs">
@@ -481,6 +482,7 @@ export default function DashboardPage() {
                             </div>
                         </>
                     )}
+                </div>
                 </main>
             </div>
         </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { SidebarShell } from '@/app/components/SidebarControls';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import authService from '@/services/authService';
@@ -77,7 +78,7 @@ export default function AdminSidebar() {
     ];
 
     return (
-        <aside className="w-64 shrink-0 h-screen bg-white border-r border-slate-200/80 shadow-xs flex flex-col py-6 z-30">
+        <SidebarShell scope="admin" className="w-64 shrink-0 h-screen bg-white border-r border-slate-200/80 shadow-xs flex flex-col py-6">
             {/* Brand Logo */}
             <div className="px-6 mb-6 flex items-center justify-between shrink-0">
                 <Link className="flex items-center gap-3" href="/admin/dashboard">
@@ -157,6 +158,6 @@ export default function AdminSidebar() {
                     </div>
                 </div>
             </div>
-        </aside>
+        </SidebarShell>
     );
 }

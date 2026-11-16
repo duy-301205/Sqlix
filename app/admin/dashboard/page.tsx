@@ -58,7 +58,8 @@ export default function AdminDashboardPage() {
     };
 
     return (
-        <main className="flex-1 overflow-y-auto px-6 sm:px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8 min-w-0 font-sans">
+        <main className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto">
+            <div className="px-6 sm:px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8 font-sans">
             {/* ================= 1. Top Action Bar: Time Range Pills & Refresh ================= */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
@@ -297,16 +298,16 @@ export default function AdminDashboardPage() {
                                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-3">
                                     <div
                                         className="bg-amber-500 h-full rounded-full transition-all duration-500"
-                                        style={{ width: `${stats.passRatePercent ?? 76}%` }}
+                                        style={{ width: `${stats.passRatePercent ?? 0}%` }}
                                     />
                                 </div>
                             </div>
-                            <div className="flex justify-between items-center text-xs">
+                            <div className="flex flex-wrap justify-between items-center gap-x-3 gap-y-1 text-xs">
                                 <span className="font-semibold text-amber-600">
-                                    {stats.totalMockTests} bộ đề thi ({stats.passRatePercent ?? 76}% đạt)
+                                    {stats.totalMockTests} bộ đề thi ({stats.passRatePercent ?? 0}% đạt)
                                 </span>
                                 <span className="text-slate-400 font-medium">
-                                    Điểm TB: {stats.averageTestScore ?? 7.8}/10
+                                    Điểm TB: {(stats.averageTestScore ?? 0).toFixed(2)}/100
                                 </span>
                             </div>
                         </div>
@@ -643,6 +644,7 @@ export default function AdminDashboardPage() {
                     </table>
                 </div>
             </div>
+        </div>
         </main>
     );
 }

@@ -107,7 +107,8 @@ export default function PracticeDetailPage({ params }: PageProps) {
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" suppressHydrationWarning>
                 <Header userName="Duy Hoàng" />
 
-                <main className="flex-1 overflow-y-auto px-6 lg:px-10 py-6 w-full max-w-[1600px] mx-auto flex flex-col space-y-6">
+                <main className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto">
+                    <div className="px-6 lg:px-10 py-6 w-full max-w-[1600px] mx-auto flex flex-col space-y-6">
                     {/* Top Breadcrumbs */}
                     <nav className="flex items-center gap-2 text-xs font-semibold text-slate-500 shrink-0">
                         <Link
@@ -274,6 +275,7 @@ export default function PracticeDetailPage({ params }: PageProps) {
                             {activeTab === 'questions' ? 'Sang tab Sơ đồ ERD →' : 'Xem danh sách câu hỏi →'}
                         </button>
                     </div>
+                </div>
                 </main>
             </div>
         </div>
