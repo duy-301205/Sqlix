@@ -11,12 +11,22 @@ interface QuestionsTabProps {
     exercises?: PracticeExercise[];
 }
 
+const normalizeDifficulty = (value: string | undefined): string => {
+    const difficulty = (value || '').trim().toLowerCase();
+    const levels: Record<string, string> = {
+        easy: 'easy', 'dễ': 'easy',
+        medium: 'medium', 'trung bình': 'medium',
+        hard: 'hard', 'khó': 'hard',
+    };
+    return levels[difficulty] || difficulty;
+};
+
 const getDifficultyColor = (diff: string | undefined): string => {
-    const d = (diff || '').toLowerCase();
-    if (d.includes('dễ') || d.includes('easy')) {
+    const d = normalizeDifficulty(diff);
+    if (d === 'easy') {
         return 'bg-emerald-50 text-emerald-700 border-emerald-200';
     }
-    if (d.includes('khó') || d.includes('hard')) {
+    if (d === 'hard') {
         return 'bg-rose-50 text-rose-700 border-rose-200';
     }
     return 'bg-blue-50 text-blue-700 border-blue-200';
@@ -35,9 +45,8 @@ export default function QuestionsTab({ dbData, exercises: propExercises }: Quest
             : (DATABASE_EXERCISES[dbData.id] || (dbData as any).exercises || []);
 
     const filteredExercises = rawExercises.filter((ex) => {
-        const diff = (ex.difficulty || '').toLowerCase();
-        const sel = filterDifficulty.toLowerCase();
-        const matchDiff = sel === 'all' || diff.includes(sel);
+        const diff = normalizeDifficulty(ex.difficulty);
+        const matchDiff = filterDifficulty === 'all' || diff === filterDifficulty;
 
         const q = searchQuery.trim().toLowerCase();
         const topicsStr = Array.isArray(ex.topics) ? ex.topics.join(' ') : (ex.topics || '');
@@ -84,14 +93,15 @@ export default function QuestionsTab({ dbData, exercises: propExercises }: Quest
                     </div>
 
                     <select
+                        aria-label="Lọc độ khó bài tập"
                         value={filterDifficulty}
                         onChange={(e) => setFilterDifficulty(e.target.value)}
                         className="w-32 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer hover:bg-slate-100 transition-colors shrink-0"
                     >
                         <option value="all">Tất cả độ khó</option>
-                        <option value="dễ">Dễ</option>
-                        <option value="trung bình">Trung bình</option>
-                        <option value="khó">Khó</option>
+                        <option value="easy">Dễ</option>
+                        <option value="medium">Trung bình</option>
+                        <option value="hard">Khó</option>
                     </select>
                 </div>
             </div>

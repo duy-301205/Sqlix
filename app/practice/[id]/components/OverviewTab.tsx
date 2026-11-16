@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { DatabaseDetail } from '../data';
 import { PracticeDatabaseDetail } from '@/types/practice';
+import { resolveErdRelationships } from './erdRelationships';
 
 interface OverviewTabProps {
     dbData: DatabaseDetail | PracticeDatabaseDetail;
@@ -15,10 +16,10 @@ export default function OverviewTab({ dbData, schemaData, compact = false }: Ove
         (schemaData && schemaData.tables && schemaData.tables.length > 0)
             ? schemaData.tables
             : dbData.tables || [];
-    const relationshipsList =
-        (schemaData && (schemaData.relationships || schemaData.relations))
-            ? (schemaData.relationships || schemaData.relations)
-            : dbData.relationships || [];
+    const relationshipsList = resolveErdRelationships(
+        tablesList,
+        schemaData?.relationships ?? schemaData?.relations ?? dbData.relationships ?? [],
+    );
 
     const defaultExpanded = tablesList[0]?.name || 'products';
     const [expandedTable, setExpandedTable] = useState<string | null>(defaultExpanded);
@@ -28,7 +29,7 @@ export default function OverviewTab({ dbData, schemaData, compact = false }: Ove
         tablesList.reduce((acc: number, t: any) => acc + (t.columns?.length || t.columnsCount || 0), 0) ||
         dbData.attributesCount ||
         0;
-    const relationsCount = relationshipsList.length || dbData.relationsCount || 0;
+    const relationsCount = relationshipsList.length;
 
     return (
         <div className={`grid grid-cols-1 ${compact ? '' : 'lg:grid-cols-12'} gap-6 pb-6`}>
@@ -124,7 +125,7 @@ export default function OverviewTab({ dbData, schemaData, compact = false }: Ove
                                                                         PK
                                                                     </span>
                                                                 )}
-                                                                {col.isFk && (
+                                                                {(col.isFk || col.references || relationshipsList.some(rel => rel.fromTable === t.name && rel.fromColumns.includes(col.name))) && (
                                                                     <span className="px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded text-[9px]">
                                                                         FK
                                                                     </span>
@@ -170,15 +171,16 @@ export default function OverviewTab({ dbData, schemaData, compact = false }: Ove
                 <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
                     <h2 className="text-base font-black text-slate-900">Mối quan hệ giữa các bảng</h2>
                     <div className="space-y-3">
-                        {relationshipsList.map((rel: any, idx: number) => (
+                        {relationshipsList.map((rel, idx: number) => (
                             <div
                                 key={idx}
+                                data-schema-relation={`${rel.fromTable}.${rel.fromColumns.join(',')}->${rel.toTable}.${rel.toColumns.join(',')}`}
                                 className="p-3.5 bg-slate-50/50 border border-slate-100 rounded-xl space-y-1"
                             >
                                 <div className="font-mono text-xs font-bold text-purple-700">
-                                    {rel.relation || `${rel.fromTable} ↔ ${rel.toTable}`}
+                                    {`${rel.fromTable} (${rel.fromColumns.join(', ')}) → ${rel.toTable} (${rel.toColumns.join(', ')})`}
                                 </div>
-                                <p className="text-xs text-slate-500">{rel.description}</p>
+                                <p className="text-xs text-slate-500">Khóa ngoại → khóa được tham chiếu{rel.fromTable === rel.toTable ? ' · Tự tham chiếu trong cùng bảng' : ''}{rel.fromColumns.length > 1 ? ' · Khóa ghép' : ''}</p>
                             </div>
                         ))}
                         {relationshipsList.length === 0 && (
