@@ -105,9 +105,10 @@ export default function MockTestDetailPage({ params }: PageProps) {
 
             {/* Main Container */}
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" suppressHydrationWarning>
-                <Header userName="Duy Hoàng" streakCount={7} />
+                <Header userName="Duy Hoàng" />
 
                 <main className={styles.main}>
+                    <div className={styles.inner}>
                     {/* Breadcrumbs chuẩn hệ thống */}
                     <nav className="flex items-center gap-2 text-xs font-semibold text-slate-500 shrink-0">
                         <Link
@@ -283,6 +284,7 @@ export default function MockTestDetailPage({ params }: PageProps) {
                             </div>
                         </div>
                     ) : null}
+                </div>
                 </main>
             </div>
         </div>

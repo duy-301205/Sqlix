@@ -36,6 +36,8 @@ export default function AdminUsersPage() {
 
     // Modal state for Create / Edit
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
     const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
     const [formData, setFormData] = useState({
         fullName: '',
@@ -125,6 +127,7 @@ export default function AdminUsersPage() {
 
     // 1. Cập nhật vai trò (Role): PUT /api/admin/users/{userId}/role
     const handleRoleChange = async (userId: string, newRole: string) => {
+        if (updatingUserId) return;
         const targetUser = users.find((u) => u.id === userId);
         const oldRole = targetUser?.role || 'USER';
 
@@ -135,7 +138,9 @@ export default function AdminUsersPage() {
         setUpdatingUserId(userId);
 
         try {
-            await adminUserService.updateUserRole(userId, newRole);
+            const updated = await adminUserService.updateUserRole(userId, newRole);
+            setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, ...updated } : u));
+            await fetchUsers();
             showToast(
                 `Đã chuyển vai trò của "${targetUser?.username || userId}" thành "${newRole}" thành công!`,
                 'success'
@@ -157,6 +162,7 @@ export default function AdminUsersPage() {
 
     // 2. Cập nhật trạng thái (Khóa / Mở khóa): PUT /api/admin/users/{userId}/status
     const handleStatusToggle = async (userId: string, currentActive: boolean) => {
+        if (updatingUserId) return;
         const nextActive = !currentActive;
         const targetUser = users.find((u) => u.id === userId);
 
@@ -175,7 +181,9 @@ export default function AdminUsersPage() {
         setUpdatingUserId(userId);
 
         try {
-            await adminUserService.updateUserStatus(userId, nextActive);
+            const updated = await adminUserService.updateUserStatus(userId, nextActive);
+            setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, ...updated } : u));
+            await fetchUsers();
             showToast(
                 `Đã ${nextActive ? 'kích hoạt mở khóa' : 'khóa tài khoản'} của "${targetUser?.username || userId}" thành công!`,
                 'success'
@@ -205,6 +213,7 @@ export default function AdminUsersPage() {
 
     // Modal Create
     const handleOpenCreateModal = () => {
+        setFormError(null);
         setEditingUser(null);
         setFormData({
             fullName: '',
@@ -219,6 +228,7 @@ export default function AdminUsersPage() {
 
     // Modal Edit
     const handleOpenEditModal = (user: AdminUser) => {
+        setFormError(null);
         setEditingUser(user);
         setFormData({
             fullName: user.fullName,
@@ -235,49 +245,28 @@ export default function AdminUsersPage() {
     const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (editingUser) {
-            // Update local state & trigger role/status update if changed
-            if (formData.role !== editingUser.role) {
-                await handleRoleChange(editingUser.id, formData.role);
-            }
-            if (formData.active !== editingUser.active) {
-                await handleStatusToggle(editingUser.id, editingUser.active);
-            }
-            setUsers((prev) =>
-                prev.map((u) =>
-                    u.id === editingUser.id
-                        ? {
-                              ...u,
-                              fullName: formData.fullName,
-                              username: formData.username,
-                              email: formData.email,
-                          }
-                        : u
-                )
-            );
-            showToast(`Đã cập nhật thông tin người dùng "${formData.username}".`, 'success');
-        } else {
-            // Thêm người dùng mới vào danh sách hiện tại
-            const newUser: AdminUser = {
-                id: `usr-${Date.now()}`,
-                username: formData.username,
-                fullName: formData.fullName,
-                email: formData.email,
-                avatarUrl: '',
-                role: formData.role,
-                active: formData.active,
-                status: formData.active ? 'ACTIVE' : 'BANNED',
-                totalExercisesSolved: 0,
-                testsTaken: 0,
-                createdAt: new Date().toISOString(),
-                lastActiveAt: new Date().toISOString(),
+        if (isSaving) return;
+        setIsSaving(true);
+        setFormError(null);
+        try {
+            const data = {
+                fullName: formData.fullName.trim(), username: formData.username.trim(),
+                email: formData.email.trim(), role: formData.role, active: formData.active,
             };
-            setUsers((prev) => [newUser, ...prev]);
-            setPagination((p) => ({ ...p, total: p.total + 1 }));
-            showToast(`Đã thêm thành viên "${formData.username}" thành công.`, 'success');
+            if (editingUser) {
+                await adminUserService.updateUser(editingUser.id, data);
+            } else {
+                await adminUserService.createUser({ ...data, password: formData.password });
+            }
+            setIsFormModalOpen(false);
+            showToast(editingUser ? 'Đã lưu thay đổi người dùng.' : 'Đã tạo tài khoản người dùng.', 'success');
+            if (!editingUser && currentPage !== 0) setCurrentPage(0);
+            else await fetchUsers();
+        } catch (err: any) {
+            setFormError(err?.response?.data?.message || err?.message || 'Không thể lưu người dùng. Vui lòng thử lại!');
+        } finally {
+            setIsSaving(false);
         }
-
-        setIsFormModalOpen(false);
     };
 
     // Xóa người dùng
@@ -320,7 +309,8 @@ export default function AdminUsersPage() {
     const hasActiveFilters = searchQuery !== '' || roleFilter !== 'ALL' || statusFilter !== 'ALL';
 
     return (
-        <main className="flex-1 overflow-y-auto px-6 sm:px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-6 min-w-0 font-sans">
+        <main className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto">
+            <div className="px-6 sm:px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-6 font-sans">
             {/* ================= 1. Top Action Bar ================= */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
@@ -544,7 +534,7 @@ export default function AdminUsersPage() {
                                 </tr>
                             ) : (
                                 users.map((user) => {
-                                    const isUpdatingThisUser = updatingUserId === user.id;
+                                    const isUpdatingThisUser = updatingUserId !== null;
 
                                     return (
                                         <tr key={user.id} className="hover:bg-slate-50/70 transition-colors">
@@ -579,10 +569,10 @@ export default function AdminUsersPage() {
                                             {/* Activity Stats */}
                                             <td className="py-4 px-6 text-center">
                                                 <div className="inline-flex items-center gap-2">
-                                                    <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold" title="Bài tập đã giải">
+                                                    <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold" title="Bài luyện tập đã đạt, mỗi bài tính một lần">
                                                         {user.totalExercisesSolved ?? 0} bài
                                                     </span>
-                                                    <span className="px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-bold" title="Lượt thi thử">
+                                                    <span className="px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-bold" title="Lượt thi đã kết thúc, gồm cả hết giờ; thi lại tính lượt mới">
                                                         {user.testsTaken ?? 0} đề thi
                                                     </span>
                                                 </div>
@@ -592,6 +582,7 @@ export default function AdminUsersPage() {
                                             <td className="py-4 px-6">
                                                 <div className="relative inline-block">
                                                     <select
+                                                        aria-label={`Vai trò của ${user.username}`}
                                                         value={user.role === 'STUDENT' ? 'USER' : user.role}
                                                         disabled={isUpdatingThisUser}
                                                         onChange={(e) => handleRoleChange(user.id, e.target.value)}
@@ -615,6 +606,9 @@ export default function AdminUsersPage() {
                                                 <div className="inline-flex items-center gap-2">
                                                     <button
                                                         type="button"
+                                                        role="switch"
+                                                        aria-checked={user.active}
+                                                        aria-label={`Trạng thái của ${user.username}`}
                                                         disabled={isUpdatingThisUser}
                                                         onClick={() => handleStatusToggle(user.id, user.active)}
                                                         className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
@@ -642,6 +636,7 @@ export default function AdminUsersPage() {
                                                     {/* Edit Button */}
                                                     <button
                                                         type="button"
+                                                        disabled={isUpdatingThisUser}
                                                         onClick={() => handleOpenEditModal(user)}
                                                         className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                                                         title="Chỉnh sửa thông tin"
@@ -654,9 +649,10 @@ export default function AdminUsersPage() {
                                                     {/* Delete Button */}
                                                     <button
                                                         type="button"
+                                                        disabled={isUpdatingThisUser || user.role === 'ADMIN'}
                                                         onClick={() => setDeleteTargetUser(user)}
                                                         className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                                        title="Xóa người dùng"
+                                                        title={user.role === 'ADMIN' ? 'Không thể xóa tài khoản Quản trị viên' : 'Xóa người dùng'}
                                                     >
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -728,6 +724,9 @@ export default function AdminUsersPage() {
             {isFormModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs">
                     <form
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={editingUser ? 'Chỉnh sửa người dùng' : 'Thêm thành viên mới'}
                         onSubmit={handleFormSubmit}
                         className="relative bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 flex flex-col max-h-[88vh] overflow-hidden"
                     >
@@ -740,6 +739,7 @@ export default function AdminUsersPage() {
                             </div>
                             <button
                                 type="button"
+                                disabled={isSaving}
                                 onClick={() => setIsFormModalOpen(false)}
                                 className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                             >
@@ -748,6 +748,8 @@ export default function AdminUsersPage() {
                         </div>
 
                         <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+                            {formError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-xs text-rose-700">{formError}</p>}
+                            <fieldset disabled={isSaving} className="space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-1">
                                     Họ và tên <span className="text-rose-500">*</span>
@@ -798,6 +800,8 @@ export default function AdminUsersPage() {
                                     </label>
                                     <input
                                         type="password"
+                                        minLength={8}
+                                        maxLength={72}
                                         required
                                         value={formData.password}
                                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -833,11 +837,13 @@ export default function AdminUsersPage() {
                                     </select>
                                 </div>
                             </div>
+                            </fieldset>
                         </div>
 
                         <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
                             <button
                                 type="button"
+                                disabled={isSaving}
                                 onClick={() => setIsFormModalOpen(false)}
                                 className="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-white transition-colors cursor-pointer"
                             >
@@ -845,9 +851,10 @@ export default function AdminUsersPage() {
                             </button>
                             <button
                                 type="submit"
+                                disabled={isSaving}
                                 className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer"
                             >
-                                {editingUser ? 'Lưu thay đổi' : 'Tạo tài khoản'}
+                                {isSaving ? 'Đang lưu...' : editingUser ? 'Lưu thay đổi' : 'Tạo tài khoản'}
                             </button>
                         </div>
                     </form>
@@ -921,6 +928,7 @@ export default function AdminUsersPage() {
                     </div>
                 </div>
             )}
+        </div>
         </main>
     );
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
+import SqlAnswerBlock from '@/app/components/SqlAnswerBlock';
 import mockTestService, { TestResultResponse } from '@/services/mockTestService';
 import historyService, { HistoryDetail } from '@/services/historyService';
 import {
@@ -115,9 +116,10 @@ export default function TestResultPage({ params }: ResultPageProps) {
             <Sidebar />
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" suppressHydrationWarning>
-                <Header userName="Học viên" streakCount={7} />
+                <Header userName="Học viên" />
 
-                <main className="flex-1 overflow-y-auto px-4 sm:px-8 lg:px-12 py-8 w-full max-w-[1000px] mx-auto space-y-8">
+                <main className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto">
+                    <div className="px-4 sm:px-8 lg:px-12 py-8 w-full max-w-[1000px] mx-auto space-y-8">
                     {/* Loading State */}
                     {isLoading ? (
                         <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-xs text-center space-y-4">
@@ -350,7 +352,7 @@ export default function TestResultPage({ params }: ResultPageProps) {
                                                         <span className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
                                                             Câu trả lời của bạn:
                                                         </span>
-                                                        <div
+                                                        {isMc ? <div
                                                             className={`p-3 rounded-xl text-xs font-mono whitespace-pre-wrap ${
                                                                 q.isCorrect
                                                                     ? 'bg-emerald-50/50 border border-emerald-200 text-slate-800'
@@ -358,7 +360,7 @@ export default function TestResultPage({ params }: ResultPageProps) {
                                                             }`}
                                                         >
                                                             {q.submittedAnswer || q.userAnswer || '(Chưa chọn câu trả lời)'}
-                                                        </div>
+                                                        </div> : <SqlAnswerBlock query={q.submittedAnswer || q.userAnswer || ''} label="Truy vấn bạn đã nộp" />}
                                                     </div>
 
                                                     {/* Đáp án chính xác */}
@@ -382,9 +384,7 @@ export default function TestResultPage({ params }: ResultPageProps) {
                                                                 </span>
                                                             </div>
                                                         ) : (
-                                                            <div className="p-3.5 rounded-xl text-xs font-mono bg-slate-900 text-emerald-400 whitespace-pre-wrap border border-slate-800 shadow-inner">
-                                                                {q.solutionQuery || q.correctAnswer || q.solutionAnswer || '(Chưa có câu truy vấn mẫu)'}
-                                                            </div>
+                                                            <SqlAnswerBlock query={q.solutionQuery || q.correctAnswer || q.solutionAnswer || ''} label="Đáp án SQL mẫu" />
                                                         )}
                                                     </div>
 
@@ -406,6 +406,7 @@ export default function TestResultPage({ params }: ResultPageProps) {
                             )}
                         </>
                     )}
+                </div>
                 </main>
             </div>
         </div>

@@ -720,7 +720,8 @@ export default function AdminPracticePage() {
     }, [databases, exercises]);
 
     return (
-        <main className="flex-1 overflow-y-auto px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8 min-w-0">
+        <main className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto">
+            <div className="px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8">
             {/* Toast Notification Banner */}
             {toast && (
                 <div
@@ -1620,6 +1621,7 @@ export default function AdminPracticePage() {
                     </div>
                 </div>
             )}
+        </div>
         </main>
     );
 }

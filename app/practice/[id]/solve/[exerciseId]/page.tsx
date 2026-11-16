@@ -736,7 +736,9 @@ export default function SolveExercisePage({ params }: SolvePageProps) {
 
                 {/* Output Content Body */}
                 {!isOutputCollapsed && (
-                    <div className="flex-1 p-3 sm:p-4 overflow-auto text-xs font-mono bg-white">
+                    <div role="region" aria-label={isFullscreenMode ? 'Kết quả SQL luyện tập toàn màn hình' : 'Kết quả SQL luyện tập'} tabIndex={0}
+                        className="min-w-0 min-h-0 w-full flex-1 p-3 sm:p-4 overflow-auto text-xs font-mono bg-white [&::-webkit-scrollbar]:h-3 [&::-webkit-scrollbar]:w-3 [&::-webkit-scrollbar-track]:bg-slate-200 [&::-webkit-scrollbar-thumb]:bg-slate-400"
+                        style={{ scrollbarGutter: 'stable', scrollbarColor: '#94a3b8 #e2e8f0' }}>
                         {/* SQL Execution Error */}
                         {runResult?.errorMessage ? (
                             <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 space-y-2">
@@ -750,8 +752,8 @@ export default function SolveExercisePage({ params }: SolvePageProps) {
                             </div>
                         ) : runResult && runResult.rows ? (
                             /* Dynamic Result Table */
-                            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-                                <table className="w-full text-left text-slate-800 divide-y divide-slate-200">
+                            <div className="min-w-full w-max border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                                <table className="min-w-full w-max text-left text-slate-800 divide-y divide-slate-200">
                                     <thead className="bg-slate-50 sticky top-0 z-10">
                                         <tr>
                                             <th className="py-2 px-3 font-mono text-[10px] text-slate-400 font-bold uppercase w-12 text-center bg-slate-50">
@@ -760,7 +762,7 @@ export default function SolveExercisePage({ params }: SolvePageProps) {
                                             {runResult.columns.map((col) => (
                                                 <th
                                                     key={col}
-                                                    className="py-2.5 px-3.5 font-bold text-slate-700 text-[11px] uppercase tracking-wider font-mono bg-slate-50"
+                                                    className="whitespace-nowrap py-2.5 px-3.5 font-bold text-slate-700 text-[11px] uppercase tracking-wider font-mono bg-slate-50"
                                                 >
                                                     {col}
                                                 </th>
@@ -833,7 +835,7 @@ export default function SolveExercisePage({ params }: SolvePageProps) {
             </div>
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-                <Header userName="Duy Hoàng" streakCount={7} />
+                <Header userName="Duy Hoàng" />
 
                 {submissionError && (
                     <p role="alert" className="bg-rose-50 px-6 py-2.5 text-xs font-medium text-rose-600 border-b border-rose-200">

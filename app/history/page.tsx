@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
+import SqlAnswerBlock from '@/app/components/SqlAnswerBlock';
 import historyService, {
     HistorySummary,
     HistoryItem,
@@ -309,10 +310,11 @@ export default function MockTestHistoryPage() {
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0" suppressHydrationWarning>
                 {/* Header */}
-                <Header userName="Duy Hoàng" streakCount={7} />
+                <Header userName="Duy Hoàng" />
 
                 {/* Scrollable Body */}
-                <main className="flex-1 overflow-y-auto px-6 sm:px-8 lg:px-10 py-6 w-full max-w-[1500px] mx-auto space-y-6">
+                <main className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto">
+                    <div className="px-6 sm:px-8 lg:px-10 py-6 w-full max-w-[1500px] mx-auto space-y-6">
                     {/* Header Trang */}
                     <div>
                         <div className="flex items-center gap-2.5">
@@ -890,6 +892,7 @@ export default function MockTestHistoryPage() {
                             </div>
                         )}
                     </div>
+                </div>
                 </main>
             </div>
 
@@ -1024,7 +1027,7 @@ export default function MockTestHistoryPage() {
                                                 <span className="text-xs font-bold text-slate-500 uppercase block mb-1">
                                                     Câu trả lời của bạn:
                                                 </span>
-                                                <div
+                                                {q.questionType === 'MULTIPLE_CHOICE' || q.type === 'MULTIPLE_CHOICE' || q.type === 'multiple_choice' ? <div
                                                     className={`p-3 rounded-lg text-xs font-mono whitespace-pre-wrap ${
                                                         q.isCorrect
                                                             ? 'bg-white border border-emerald-200 text-slate-800'
@@ -1032,14 +1035,14 @@ export default function MockTestHistoryPage() {
                                                     }`}
                                                 >
                                                     {q.userAnswer || q.submittedAnswer || '(Không có câu trả lời)'}
-                                                </div>
+                                                </div> : <SqlAnswerBlock query={q.userAnswer || q.submittedAnswer || ''} label="Truy vấn bạn đã nộp" />}
                                             </div>
 
                                             <div className="mb-3">
                                                 <span className="text-xs font-bold text-emerald-700 uppercase block mb-1">
                                                     Đáp án chính xác:
                                                 </span>
-                                                {q.type === 'MULTIPLE_CHOICE' || q.type === 'multiple_choice' ? (
+                                                {q.questionType === 'MULTIPLE_CHOICE' || q.type === 'MULTIPLE_CHOICE' || q.type === 'multiple_choice' ? (
                                                     <div className="p-3 rounded-lg text-xs font-semibold bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-2">
                                                         <span className="w-6 h-6 rounded-md bg-emerald-600 text-white font-bold flex items-center justify-center text-xs shadow-xs">
                                                             {q.solutionAnswer || q.correctAnswer || q.mcCorrectOption || '?'}
@@ -1050,9 +1053,7 @@ export default function MockTestHistoryPage() {
                                                         </span>
                                                     </div>
                                                 ) : (
-                                                    <div className="p-3 rounded-lg text-xs font-mono bg-slate-900 text-emerald-400 whitespace-pre-wrap border border-slate-800">
-                                                        {q.solutionAnswer || q.correctAnswer || q.solutionQuery || '(Chưa có câu truy vấn mẫu)'}
-                                                    </div>
+                                                    <SqlAnswerBlock query={q.solutionQuery || q.solutionAnswer || q.correctAnswer || ''} label="Đáp án SQL mẫu" />
                                                 )}
                                             </div>
 

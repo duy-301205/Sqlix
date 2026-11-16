@@ -222,7 +222,7 @@ export default function MockTestRoomPage({ params }: MockTestRoomPageProps) {
             <Sidebar />
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-                <Header userName="Duy Hoàng" streakCount={7} />
+                <Header userName="Duy Hoàng" />
 
                 {/* Top Controls Header */}
                 <div className="bg-white border-b border-slate-200 px-6 py-2.5 flex items-center justify-between shrink-0 shadow-xs z-10">

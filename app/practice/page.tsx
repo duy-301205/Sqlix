@@ -99,9 +99,10 @@ export default function PracticePage() {
 
             {/* Main Content View */}
             <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-                <Header userName="Duy Hoàng" streakCount={7} />
+                <Header userName="Duy Hoàng" />
 
-                <main className="flex-1 overflow-y-auto px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8">
+                <main className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto">
+                    <div className="px-8 lg:px-12 py-8 w-full max-w-[1600px] mx-auto space-y-8">
                     {/* Header & Controls */}
                     <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2">
                         <div>
@@ -330,6 +331,7 @@ export default function PracticePage() {
                             Gửi đề xuất
                         </button>
                     </div>
+                </div>
                 </main>
             </div>
         </div>

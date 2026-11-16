@@ -172,7 +172,8 @@ export default function ProfilePage() {
                 <Header userName={profile?.full_name} streakCount={profile?.current_streak} />
 
                 {/* Scrollable Body */}
-                <main className="flex-1 overflow-y-auto px-4 sm:px-8 lg:px-12 py-8 w-full max-w-[1200px] mx-auto space-y-6">
+                <main className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto">
+                    <div className="px-4 sm:px-8 lg:px-12 py-8 w-full max-w-[1200px] mx-auto space-y-6">
                     {/* Toast Thông báo thành công */}
                     {saveToast && (
                         <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-bold flex items-center justify-between gap-3 shadow-xs animate-in fade-in slide-in-from-top-2 duration-200">
@@ -649,6 +650,7 @@ export default function ProfilePage() {
                             )}
                         </div>
                     )}
+                </div>
                 </main>
             </div>
         </div>

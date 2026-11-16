@@ -101,13 +101,15 @@ export default function AdminHeader() {
     return (
         <header className="flex justify-between items-center w-full px-6 md:px-10 py-5 bg-[#f8f9ff]/80 backdrop-blur-md sticky top-0 z-20 border-b border-slate-200/60 shrink-0">
             {/* Left: Greeting / Title */}
-            <div className="flex flex-col">
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2 tracking-tight">
-                    {title} 🛡️
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                    {subtitle}
-                </p>
+            <div className="flex min-w-0 items-center gap-3">
+                <div className="flex min-w-0 flex-col">
+                    <h1 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2 tracking-tight">
+                        {title} 🛡️
+                    </h1>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                        {subtitle}
+                    </p>
+                </div>
             </div>
 
             {/* Right: Actions (Status, Notifications, User Profile Menu) */}
